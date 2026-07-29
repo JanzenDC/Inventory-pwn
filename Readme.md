@@ -81,3 +81,6 @@ compile_inventory_online.bat
 3. `"main_scripts": ["inventory_test_online 1"]`  
 
 Guide: [INVENTORY_ONLINE.md](docs/INVENTORY_ONLINE.md)
+
+<img width="1436" height="558" alt="image" src="https://github.com/user-attachments/assets/b87f3b14-228a-4652-be50-a67e94e9f4d9" />
+
