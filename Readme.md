@@ -36,8 +36,9 @@ qawno\pawncc.exe gamemodes\inventory_test.pwn -iqawno\include -ogamemodes\invent
 | `/giveitem` | Add 3x Bread + 1x Pistol |
 | `/dropfront` | Spawn 2x Medkit on the ground in front of you |
 | `/inv` | Open inventory (left bag / right nearby drops) |
-| Click left slot | Select bag item |
-| Click right slot | Take that item from the nearest bag |
+| Click left slot | Select item (click again to cancel) |
+| Click right slot | Select bag item, or place selected item there |
+| Click 2nd slot | Move / swap / stack onto that target |
 | **Use** | Fires `Inv_OnItemUse` |
 | **Drop** | Drop item in front of you (shows on right panel) |
 | **Close** / ESC | Close UI |

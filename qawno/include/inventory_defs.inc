@@ -47,7 +47,7 @@
 	#define INV_SELECT_COLOUR       (0xFFb05748)
 #endif
 #if !defined INV_DROP_OBJECT_MODEL
-	#define INV_DROP_OBJECT_MODEL   (2919)
+	#define INV_DROP_OBJECT_MODEL   (11745)
 #endif
 
 forward Inventory_Add(playerid, const item[], model, quantity = 1);

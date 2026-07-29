@@ -5,7 +5,9 @@
  *
  * Left panel  = player inventory (5x4 model previews)
  * Right panel = nearest dropped bag contents
- * Actions     = Use / Drop / Close (Drop places the item in front of the player)
+ * Actions     = Use / Drop / Close
+ * Move items  = click source slot, then click target slot (left <-> right or rearrange)
+ *              (textdraws cannot true-drag; this is click-to-move)
  *
  *   #include <open.mp>
  *   #include <inventory>
@@ -90,8 +92,14 @@ static PlayerText:g_Inv2Qty[MAX_PLAYERS][INV_UI_SLOTS];
 static bool:g_InvOpen[MAX_PLAYERS];
 static g_InvSelected[MAX_PLAYERS];
 static g_InvSelected2[MAX_PLAYERS];
+static g_InvDragPanel[MAX_PLAYERS]; // 0 none, 1 left, 2 right
+static g_InvDragSlot[MAX_PLAYERS];
 static bool:g_InvBuilt[MAX_PLAYERS];
 static bool:g_InvIgnoreEsc[MAX_PLAYERS];
+
+#define INV_PANEL_NONE  (0)
+#define INV_PANEL_LEFT  (1)
+#define INV_PANEL_RIGHT (2)
 
 // ---------------------------------------------------------------------------
 // Core inventory ops
@@ -108,6 +116,8 @@ stock Inventory_Clear(playerid)
 	}
 	g_InvSelected[playerid] = -1;
 	g_InvSelected2[playerid] = -1;
+	g_InvDragPanel[playerid] = INV_PANEL_NONE;
+	g_InvDragSlot[playerid] = -1;
 	return 1;
 }
 
@@ -118,6 +128,8 @@ stock Inventory_OnPlayerConnect(playerid)
 	g_InvBuilt[playerid] = false;
 	g_InvIgnoreEsc[playerid] = false;
 	g_InvNearPile[playerid] = -1;
+	g_InvDragPanel[playerid] = INV_PANEL_NONE;
+	g_InvDragSlot[playerid] = -1;
 	return 1;
 }
 
@@ -495,6 +507,196 @@ stock Inv_GatherNearbyDrops(playerid)
 {
 	g_InvNearPile[playerid] = Item_Nearest(playerid, INV_DROP_RANGE);
 	return (g_InvNearPile[playerid] != -1) ? DropPile_CountItems(g_InvNearPile[playerid]) : 0;
+}
+
+stock Inv_ClearDrag(playerid)
+{
+	new prevL = g_InvSelected[playerid];
+	new prevR = g_InvSelected2[playerid];
+	g_InvDragPanel[playerid] = INV_PANEL_NONE;
+	g_InvDragSlot[playerid] = -1;
+	g_InvSelected[playerid] = -1;
+	g_InvSelected2[playerid] = -1;
+	if (g_InvOpen[playerid])
+	{
+		if (prevL != -1)
+			Inv_RefreshSlot(playerid, prevL);
+		if (prevR != -1)
+			Inv_RefreshRightSlot(playerid, prevR);
+	}
+	return 1;
+}
+
+stock Inv_SetDrag(playerid, panel, slot)
+{
+	new prevL = g_InvSelected[playerid];
+	new prevR = g_InvSelected2[playerid];
+
+	g_InvDragPanel[playerid] = panel;
+	g_InvDragSlot[playerid] = slot;
+	g_InvSelected[playerid] = (panel == INV_PANEL_LEFT) ? slot : -1;
+	g_InvSelected2[playerid] = (panel == INV_PANEL_RIGHT) ? slot : -1;
+
+	if (prevL != -1)
+		Inv_RefreshSlot(playerid, prevL);
+	if (prevR != -1)
+		Inv_RefreshRightSlot(playerid, prevR);
+	if (panel == INV_PANEL_LEFT)
+		Inv_RefreshSlot(playerid, slot);
+	else if (panel == INV_PANEL_RIGHT)
+		Inv_RefreshRightSlot(playerid, slot);
+
+	SendClientMessage(playerid, 0xAAAAAAFF, "Selected - click another slot to move (left bag or right ground).");
+	return 1;
+}
+
+stock DropPile_GetOrCreateNearPlayer(playerid)
+{
+	new pileid = Item_Nearest(playerid, INV_DROP_RANGE);
+	if (pileid != -1)
+		return pileid;
+
+	new Float:x, Float:y, Float:z, Float:a;
+	GetPlayerPos(playerid, x, y, z);
+	GetPlayerFacingAngle(playerid, a);
+	x += INV_DROP_FORWARD * floatsin(-a, degrees);
+	y += INV_DROP_FORWARD * floatcos(-a, degrees);
+	return DropPile_Create(x, y, z, GetPlayerInterior(playerid), GetPlayerVirtualWorld(playerid));
+}
+
+// Move / swap / stack between any two slots (left inventory or right bag).
+stock Inv_MoveBetweenSlots(playerid, fromPanel, fromSlot, toPanel, toSlot)
+{
+	if (fromPanel == toPanel && fromSlot == toSlot)
+		return 0;
+
+	new bool:fromExists, fromModel, fromQty, fromName[MAX_INVENTORY_ITEM_NAME];
+	new bool:toExists, toModel, toQty, toName[MAX_INVENTORY_ITEM_NAME];
+	new pileid = g_InvNearPile[playerid];
+
+	if (fromPanel == INV_PANEL_RIGHT || toPanel == INV_PANEL_RIGHT)
+	{
+		if (toPanel == INV_PANEL_RIGHT && (pileid < 0 || !DropPiles[pileid][dropExists]))
+		{
+			pileid = DropPile_GetOrCreateNearPlayer(playerid);
+			if (pileid == -1)
+				return 0;
+			g_InvNearPile[playerid] = pileid;
+		}
+		if (fromPanel == INV_PANEL_RIGHT && (pileid < 0 || !DropPiles[pileid][dropExists]))
+			return 0;
+	}
+
+	if (fromPanel == INV_PANEL_LEFT)
+	{
+		if (fromSlot < 0 || fromSlot >= MAX_INVENTORY || !InventoryData[playerid][fromSlot][invExists])
+			return 0;
+		fromExists = true;
+		fromModel = InventoryData[playerid][fromSlot][invModel];
+		fromQty = InventoryData[playerid][fromSlot][invQuantity];
+		format(fromName, sizeof(fromName), "%s", InventoryData[playerid][fromSlot][invItem]);
+	}
+	else
+	{
+		if (fromSlot < 0 || fromSlot >= MAX_INVENTORY || !DropPileSlots[pileid][fromSlot][invExists])
+			return 0;
+		fromExists = true;
+		fromModel = DropPileSlots[pileid][fromSlot][invModel];
+		fromQty = DropPileSlots[pileid][fromSlot][invQuantity];
+		format(fromName, sizeof(fromName), "%s", DropPileSlots[pileid][fromSlot][invItem]);
+	}
+
+	if (toPanel == INV_PANEL_LEFT)
+	{
+		toExists = InventoryData[playerid][toSlot][invExists];
+		toModel = InventoryData[playerid][toSlot][invModel];
+		toQty = InventoryData[playerid][toSlot][invQuantity];
+		format(toName, sizeof(toName), "%s", InventoryData[playerid][toSlot][invItem]);
+	}
+	else
+	{
+		toExists = DropPileSlots[pileid][toSlot][invExists];
+		toModel = DropPileSlots[pileid][toSlot][invModel];
+		toQty = DropPileSlots[pileid][toSlot][invQuantity];
+		format(toName, sizeof(toName), "%s", DropPileSlots[pileid][toSlot][invItem]);
+	}
+
+	// Stack same items onto target
+	if (toExists && !strcmp(fromName, toName, true) && fromModel == toModel)
+	{
+		toQty += fromQty;
+		fromExists = false;
+		fromQty = 0;
+		fromModel = 0;
+		fromName[0] = EOS;
+	}
+	else
+	{
+		// Swap (or move into empty)
+		new bool:tmpExists = toExists, tmpModel = toModel, tmpQty = toQty, tmpName[MAX_INVENTORY_ITEM_NAME];
+		format(tmpName, sizeof(tmpName), "%s", toName);
+
+		toExists = fromExists;
+		toModel = fromModel;
+		toQty = fromQty;
+		format(toName, sizeof(toName), "%s", fromName);
+
+		fromExists = tmpExists;
+		fromModel = tmpModel;
+		fromQty = tmpQty;
+		format(fromName, sizeof(fromName), "%s", tmpName);
+	}
+
+	if (fromPanel == INV_PANEL_LEFT)
+	{
+		InventoryData[playerid][fromSlot][invExists] = fromExists;
+		InventoryData[playerid][fromSlot][invModel] = fromModel;
+		InventoryData[playerid][fromSlot][invQuantity] = fromQty;
+		format(InventoryData[playerid][fromSlot][invItem], MAX_INVENTORY_ITEM_NAME, "%s", fromName);
+	}
+	else
+	{
+		DropPileSlots[pileid][fromSlot][invExists] = fromExists;
+		DropPileSlots[pileid][fromSlot][invModel] = fromModel;
+		DropPileSlots[pileid][fromSlot][invQuantity] = fromQty;
+		format(DropPileSlots[pileid][fromSlot][invItem], MAX_INVENTORY_ITEM_NAME, "%s", fromName);
+	}
+
+	if (toPanel == INV_PANEL_LEFT)
+	{
+		InventoryData[playerid][toSlot][invExists] = toExists;
+		InventoryData[playerid][toSlot][invModel] = toModel;
+		InventoryData[playerid][toSlot][invQuantity] = toQty;
+		format(InventoryData[playerid][toSlot][invItem], MAX_INVENTORY_ITEM_NAME, "%s", toName);
+	}
+	else
+	{
+		DropPileSlots[pileid][toSlot][invExists] = toExists;
+		DropPileSlots[pileid][toSlot][invModel] = toModel;
+		DropPileSlots[pileid][toSlot][invQuantity] = toQty;
+		format(DropPileSlots[pileid][toSlot][invItem], MAX_INVENTORY_ITEM_NAME, "%s", toName);
+	}
+
+	if (fromPanel == INV_PANEL_LEFT && toPanel == INV_PANEL_RIGHT)
+		CallLocalFunction("Inv_OnItemDrop", "ddsii", playerid, fromSlot, toName, toModel, toQty);
+	else if (fromPanel == INV_PANEL_RIGHT && toPanel == INV_PANEL_LEFT)
+		CallLocalFunction("Inv_OnItemPickup", "ddsii", playerid, pileid, toName, toModel, toQty);
+
+	if (pileid != -1 && DropPiles[pileid][dropExists])
+	{
+		if (DropPile_CountItems(pileid) <= 0)
+		{
+			DestroyDropPile(pileid);
+			g_InvNearPile[playerid] = -1;
+		}
+		else
+			DropPile_UpdateLabel(pileid);
+	}
+
+	Inv_ClearDrag(playerid);
+	Inv_RefreshPanel(playerid);
+	Inv_RefreshRightPanel(playerid);
+	return 1;
 }
 
 stock Inv_DoDropFromSlot(playerid, slot, amount)
@@ -917,6 +1119,8 @@ stock Inventory_Show(playerid)
 
 	g_InvSelected[playerid] = -1;
 	g_InvSelected2[playerid] = -1;
+	g_InvDragPanel[playerid] = INV_PANEL_NONE;
+	g_InvDragSlot[playerid] = -1;
 	Inv_CreateUI(playerid);
 
 	new name[MAX_PLAYER_NAME], title[48];
@@ -950,6 +1154,8 @@ stock Inventory_Hide(playerid)
 	g_InvOpen[playerid] = false;
 	g_InvSelected[playerid] = -1;
 	g_InvSelected2[playerid] = -1;
+	g_InvDragPanel[playerid] = INV_PANEL_NONE;
+	g_InvDragSlot[playerid] = -1;
 	Inv_DestroyUI(playerid);
 	g_InvIgnoreEsc[playerid] = true;
 	CancelSelectTextDraw(playerid);
@@ -973,43 +1179,60 @@ stock Inv_ClickPlayerTD(playerid, PlayerText:playertextid)
 	if (playertextid == PlayerText:INVALID_TEXT_DRAW || !g_InvOpen[playerid])
 		return 0;
 
-	// Left slots
+	// Left slots - select or move/swap onto this slot
 	for (new slot = 0; slot < INV_UI_SLOTS; slot++)
 	{
-		if (playertextid == g_InvPreview[playerid][slot])
+		if (playertextid != g_InvPreview[playerid][slot])
+			continue;
+
+		if (g_InvDragPanel[playerid] == INV_PANEL_NONE)
 		{
-			new prev = g_InvSelected[playerid];
-			new prev2 = g_InvSelected2[playerid];
-			g_InvSelected2[playerid] = -1;
-			g_InvSelected[playerid] = (InventoryData[playerid][slot][invExists]) ? slot : -1;
-			if (prev != -1)
-				Inv_RefreshSlot(playerid, prev);
-			if (prev2 != -1)
-				Inv_RefreshRightSlot(playerid, prev2);
-			if (g_InvSelected[playerid] != -1)
-				Inv_RefreshSlot(playerid, g_InvSelected[playerid]);
-			PlayerTextDrawSetString(playerid, g_InvBtn[playerid][1], "Drop");
+			if (!InventoryData[playerid][slot][invExists])
+				return 1;
+			Inv_SetDrag(playerid, INV_PANEL_LEFT, slot);
 			return 1;
 		}
+
+		if (g_InvDragPanel[playerid] == INV_PANEL_LEFT && g_InvDragSlot[playerid] == slot)
+		{
+			Inv_ClearDrag(playerid);
+			SendClientMessage(playerid, 0xAAAAAAFF, "Move cancelled.");
+			return 1;
+		}
+
+		if (!Inv_MoveBetweenSlots(playerid, g_InvDragPanel[playerid], g_InvDragSlot[playerid], INV_PANEL_LEFT, slot))
+			SendClientMessage(playerid, 0xFFFF00AA, "Could not move that item.");
+		return 1;
 	}
 
-	// Right slots - contents of the nearest bag only
+	// Right slots - select bag item or drop/move onto that bag slot
 	for (new ui = 0; ui < INV_UI_SLOTS; ui++)
 	{
-		if (playertextid == g_Inv2Preview[playerid][ui])
-		{
-			new pileid = g_InvNearPile[playerid];
-			if (pileid < 0 || !DropPiles[pileid][dropExists])
-				return 1;
-			if (!DropPileSlots[pileid][ui][invExists])
-				return 1;
+		if (playertextid != g_Inv2Preview[playerid][ui])
+			continue;
 
-			if (!Inventory_PickupDropped(playerid, pileid, ui))
-				SendClientMessage(playerid, 0xFFFF00AA, "Could not take that item (inventory full?).");
-			else
-				SendClientMessage(playerid, 0x33CCFFFF, "Item taken from the bag.");
+		new pileid = g_InvNearPile[playerid];
+		new bool:hasItem = (pileid != -1 && DropPiles[pileid][dropExists] && DropPileSlots[pileid][ui][invExists]);
+
+		if (g_InvDragPanel[playerid] == INV_PANEL_NONE)
+		{
+			if (!hasItem)
+				return 1;
+			Inv_SetDrag(playerid, INV_PANEL_RIGHT, ui);
 			return 1;
 		}
+
+		if (g_InvDragPanel[playerid] == INV_PANEL_RIGHT && g_InvDragSlot[playerid] == ui)
+		{
+			Inv_ClearDrag(playerid);
+			SendClientMessage(playerid, 0xAAAAAAFF, "Move cancelled.");
+			return 1;
+		}
+
+		// Left -> right empty/occupied, or right -> right rearrange
+		if (!Inv_MoveBetweenSlots(playerid, g_InvDragPanel[playerid], g_InvDragSlot[playerid], INV_PANEL_RIGHT, ui))
+			SendClientMessage(playerid, 0xFFFF00AA, "Could not move that item.");
+		return 1;
 	}
 
 	// Use
@@ -1028,7 +1251,7 @@ stock Inv_ClickPlayerTD(playerid, PlayerText:playertextid)
 		return 1;
 	}
 
-	// Drop (places item in front of player - appears on right panel)
+	// Drop button (still drops in front / into nearest bag freely)
 	if (playertextid == g_InvBtn[playerid][1])
 	{
 		new slot = g_InvSelected[playerid];
@@ -1044,6 +1267,7 @@ stock Inv_ClickPlayerTD(playerid, PlayerText:playertextid)
 		}
 
 		Inv_DoDropFromSlot(playerid, slot, qty);
+		Inv_ClearDrag(playerid);
 		return 1;
 	}
 

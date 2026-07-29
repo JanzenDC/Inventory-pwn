@@ -77,7 +77,7 @@ public OnPlayerConnect(playerid)
 {
     Inventory_OnPlayerConnect(playerid);
     SendClientMessage(playerid, 0xFFFFFFFF, "Welcome! /giveitem, /dropfront, then /inv.");
-    SendClientMessage(playerid, 0xAAAAAAFF, "Left = your bag. Right = ground items (click a right slot to take).");
+    SendClientMessage(playerid, 0xAAAAAAFF, "Click an item, then click another slot to move (left <-> right).");
     return 1;
 }
 
