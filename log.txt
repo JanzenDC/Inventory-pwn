@@ -450,3 +450,4 @@ Loaded 22 component(s) from C:\Users\janze\Downloads\Server\components
 [2026-07-29T10:24:12+0800] [Warning] This won't affect the server's behaviour.
 [2026-07-29T10:24:16+0800] [Info] [connection] incoming connection: 127.0.0.1:51331 id: 0
 [2026-07-29T10:24:16+0800] [Info] [join] Janz_Caruso has joined the server (0:127.0.0.1)
+[2026-07-29T11:05:20+0800] [Info] [part] Janz_Caruso has left the server (0:1)

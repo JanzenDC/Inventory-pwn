@@ -47,6 +47,17 @@ enum inventoryData
 
 static InventoryData[MAX_PLAYERS][MAX_INVENTORY][inventoryData];
 
+// Weapon id -> object model (for inventory preview / placegun)
+new const Inv_WeaponModels[] =
+{
+	0, 331, 333, 334, 335, 336, 337, 338, 339, 341, 321, 322, 323, 324,
+	325, 326, 342, 343, 344, 0, 0, 0, 346, 347, 348, 349, 350, 351, 352,
+	353, 355, 356, 372, 357, 358, 359, 360, 361, 362, 363, 364, 365, 366,
+	367, 368, 368, 371
+};
+
+#define INV_GUN_PREFIX "Gun: "
+
 // ---------------------------------------------------------------------------
 // World drop piles (one bag object can hold many item slots)
 // ---------------------------------------------------------------------------
@@ -231,6 +242,113 @@ stock Inventory_SetSlot(playerid, slot, const item[], model, quantity)
 stock Inv_NotifyChanged(playerid)
 {
 	CallLocalFunction("Inv_OnInventoryChanged", "d", playerid);
+	return 1;
+}
+
+// ---------------------------------------------------------------------------
+// Guns (place from hand / use to equip)
+// ---------------------------------------------------------------------------
+
+stock Inv_ModelForWeaponId(weaponid)
+{
+	if (weaponid < 0 || weaponid >= sizeof(Inv_WeaponModels))
+		return 0;
+	return Inv_WeaponModels[weaponid];
+}
+
+stock Inv_WeaponIdFromModel(model)
+{
+	if (!model)
+		return 0;
+	for (new w = 1; w < sizeof(Inv_WeaponModels); w++)
+		if (Inv_WeaponModels[w] == model)
+			return w;
+	return 0;
+}
+
+stock Inv_IsGunItem(const item[])
+{
+	return bool:(strfind(item, INV_GUN_PREFIX, true) == 0);
+}
+
+stock Inv_IsPlaceableWeapon(weaponid)
+{
+	// Must be a real held weapon with a preview model (not fist / invalid)
+	return (weaponid >= 1 && weaponid <= 46 && Inv_ModelForWeaponId(weaponid) != 0);
+}
+
+stock Inv_FormatGunItemName(weaponid, dest[], destLen = sizeof(dest))
+{
+	new wname[32];
+	GetWeaponName(WEAPON:weaponid, wname, sizeof(wname));
+	if (!wname[0])
+		format(wname, sizeof(wname), "Weapon %d", weaponid);
+	format(dest, destLen, "%s%s", INV_GUN_PREFIX, wname);
+	return 1;
+}
+
+// Put the currently held weapon + ammo into inventory. Fails if not holding a gun.
+stock Inventory_PlaceGun(playerid)
+{
+	if (!IsPlayerConnected(playerid))
+		return 0;
+
+	new weaponid = _:GetPlayerWeapon(playerid);
+	if (!Inv_IsPlaceableWeapon(weaponid))
+	{
+		SendClientMessage(playerid, 0xFFFF00AA, "You must be holding a gun to place it.");
+		return 0;
+	}
+
+	new ammo = GetPlayerAmmo(playerid);
+	if (ammo < 1)
+		ammo = 1;
+
+	new model = Inv_ModelForWeaponId(weaponid);
+	new itemName[MAX_INVENTORY_ITEM_NAME];
+	Inv_FormatGunItemName(weaponid, itemName, sizeof(itemName));
+
+	if (!Inventory_Add(playerid, itemName, model, ammo))
+		return 0;
+
+	RemovePlayerWeapon(playerid, WEAPON:weaponid);
+	SendClientMessage(playerid, 0x33CCFFFF, "Gun placed in your inventory. Open /inv and press Use to equip it.");
+	return 1;
+}
+
+// Give the gun from an inventory slot into the player's hands, then remove the slot.
+stock Inventory_EquipGun(playerid, slot)
+{
+	if (!IsPlayerConnected(playerid) || slot < 0 || slot >= MAX_INVENTORY)
+		return 0;
+	if (!InventoryData[playerid][slot][invExists])
+		return 0;
+	if (!Inv_IsGunItem(InventoryData[playerid][slot][invItem]))
+		return 0;
+
+	new weaponid = Inv_WeaponIdFromModel(InventoryData[playerid][slot][invModel]);
+	if (!Inv_IsPlaceableWeapon(weaponid))
+		return 0;
+
+	new ammo = InventoryData[playerid][slot][invQuantity];
+	if (ammo < 1)
+		ammo = 1;
+
+	GivePlayerWeapon(playerid, WEAPON:weaponid, ammo);
+	SetPlayerArmedWeapon(playerid, WEAPON:weaponid);
+
+	// Clear whole gun slot (quantity is ammo, not stack count of items)
+	InventoryData[playerid][slot][invExists] = false;
+	InventoryData[playerid][slot][invItem][0] = EOS;
+	InventoryData[playerid][slot][invModel] = 0;
+	InventoryData[playerid][slot][invQuantity] = 0;
+	if (g_InvSelected[playerid] == slot)
+		g_InvSelected[playerid] = -1;
+	if (g_InvOpen[playerid])
+		Inv_RefreshSlot(playerid, slot);
+	Inv_NotifyChanged(playerid);
+
+	SendClientMessage(playerid, 0x33CCFFFF, "Gun equipped.");
 	return 1;
 }
 
@@ -798,7 +916,10 @@ stock Inv_RefreshSlot(playerid, slot)
 		PlayerTextDrawSetPreviewModel(playerid, g_InvPreview[playerid][slot], InventoryData[playerid][slot][invModel]);
 		PlayerTextDrawBackgroundColour(playerid, g_InvPreview[playerid][slot], selected ? (-1523963217) : (30));
 		PlayerTextDrawSetString(playerid, g_InvName[playerid][slot], InventoryData[playerid][slot][invItem]);
-		format(string, sizeof(string), "%i", InventoryData[playerid][slot][invQuantity]);
+		if (Inv_IsGunItem(InventoryData[playerid][slot][invItem]))
+			format(string, sizeof(string), "A:%i", InventoryData[playerid][slot][invQuantity]);
+		else
+			format(string, sizeof(string), "%i", InventoryData[playerid][slot][invQuantity]);
 		PlayerTextDrawSetString(playerid, g_InvQty[playerid][slot], string);
 		PlayerTextDrawUseBox(playerid, g_InvAccent[playerid][slot], true);
 		PlayerTextDrawShow(playerid, g_InvName[playerid][slot]);
@@ -856,7 +977,10 @@ stock Inv_RefreshRightSlot(playerid, ui)
 		PlayerTextDrawSetPreviewModel(playerid, g_Inv2Preview[playerid][ui], DropPileSlots[pileid][ui][invModel]);
 		PlayerTextDrawBackgroundColour(playerid, g_Inv2Preview[playerid][ui], selected ? (-1523963217) : (30));
 		PlayerTextDrawSetString(playerid, g_Inv2Name[playerid][ui], DropPileSlots[pileid][ui][invItem]);
-		format(string, sizeof(string), "%i", DropPileSlots[pileid][ui][invQuantity]);
+		if (Inv_IsGunItem(DropPileSlots[pileid][ui][invItem]))
+			format(string, sizeof(string), "A:%i", DropPileSlots[pileid][ui][invQuantity]);
+		else
+			format(string, sizeof(string), "%i", DropPileSlots[pileid][ui][invQuantity]);
 		PlayerTextDrawSetString(playerid, g_Inv2Qty[playerid][ui], string);
 		PlayerTextDrawUseBox(playerid, g_Inv2Accent[playerid][ui], true);
 		PlayerTextDrawShow(playerid, g_Inv2Name[playerid][ui]);
@@ -1295,6 +1419,14 @@ stock Inv_ClickPlayerTD(playerid, PlayerText:playertextid)
 
 		new itemName[MAX_INVENTORY_ITEM_NAME];
 		format(itemName, sizeof(itemName), "%s", InventoryData[playerid][slot][invItem]);
+
+		// Guns: equip to hand automatically
+		if (Inv_IsGunItem(itemName))
+		{
+			Inventory_EquipGun(playerid, slot);
+			return 1;
+		}
+
 		CallLocalFunction("Inv_OnItemUse", "ddsii",
 			playerid, slot, itemName,
 			InventoryData[playerid][slot][invModel],
@@ -1310,15 +1442,16 @@ stock Inv_ClickPlayerTD(playerid, PlayerText:playertextid)
 			return SendClientMessage(playerid, 0xAAAAAAFF, "Select an inventory item first."), 1;
 
 		new qty = InventoryData[playerid][slot][invQuantity];
-		if (qty > 1)
+		// Guns always drop as one whole weapon (ammo stays with it)
+		if (Inv_IsGunItem(InventoryData[playerid][slot][invItem]) || qty <= 1)
 		{
-			ShowPlayerDialog(playerid, DIALOG_INV_AMOUNT, DIALOG_STYLE_INPUT,
-				"Drop amount", "Enter how many to drop in front of you:", "Drop", "Cancel");
+			Inv_DoDropFromSlot(playerid, slot, qty);
+			Inv_ClearDrag(playerid);
 			return 1;
 		}
 
-		Inv_DoDropFromSlot(playerid, slot, qty);
-		Inv_ClearDrag(playerid);
+		ShowPlayerDialog(playerid, DIALOG_INV_AMOUNT, DIALOG_STYLE_INPUT,
+			"Drop amount", "Enter how many to drop in front of you:", "Drop", "Cancel");
 		return 1;
 	}
 

@@ -10,7 +10,9 @@
       - Edit MYSQL_* defines below to match your server
 
     Commands:
-      /giveitem   - give Bread + Pistol
+      /giveitem   - give Bread + Medkit
+      /givegun    - give a Deagle in your hand (for /placegun)
+      /placegun   - store held gun + ammo into inventory
       /dropfront  - drop Medkit in front
       /inv        - open inventory
       /saveinv    - force-save inventory now
@@ -35,7 +37,6 @@ new g_SQL;
 enum
 {
     ITEM_BREAD,
-    ITEM_PISTOL,
     ITEM_MEDKIT
 }
 
@@ -48,7 +49,6 @@ enum E_ITEM_INFO
 new const g_Items[][E_ITEM_INFO] =
 {
     { "Bread",  2670  },
-    { "Pistol", 346   },
     { "Medkit", 11738 }
 };
 
@@ -220,8 +220,8 @@ public OnPlayerConnect(playerid)
     Inventory_OnPlayerConnect(playerid);
     InvDB_Load(playerid);
 
-    SendClientMessage(playerid, 0xFFFFFFFF, "Welcome! Inventory is MySQL-backed. /giveitem /dropfront /inv /saveinv");
-    SendClientMessage(playerid, 0xAAAAAAFF, "Click an item, then click another slot to move (left <-> right).");
+    SendClientMessage(playerid, 0xFFFFFFFF, "Welcome! MySQL inventory. /giveitem /givegun /placegun /dropfront /inv /saveinv");
+    SendClientMessage(playerid, 0xAAAAAAFF, "Hold a gun + /placegun to store. In /inv press Use to equip. Guns auto-save ammo.");
     return 1;
 }
 
@@ -250,8 +250,22 @@ public OnPlayerCommandText(playerid, cmdtext[])
     if (!strcmp(cmdtext, "/giveitem", true))
     {
         GiveItem(playerid, ITEM_BREAD, 3);
-        GiveItem(playerid, ITEM_PISTOL, 1);
-        SendClientMessage(playerid, 0xFFFFFFFF, "Gave you 3x Bread and 1x Pistol (will auto-save).");
+        GiveItem(playerid, ITEM_MEDKIT, 1);
+        SendClientMessage(playerid, 0xFFFFFFFF, "Gave you 3x Bread and 1x Medkit (will auto-save).");
+        return 1;
+    }
+
+    if (!strcmp(cmdtext, "/givegun", true))
+    {
+        GivePlayerWeapon(playerid, WEAPON_DEAGLE, 50);
+        SetPlayerArmedWeapon(playerid, WEAPON_DEAGLE);
+        SendClientMessage(playerid, 0xFFFFFFFF, "Gave you a Desert Eagle (50 ammo). Use /placegun while holding it.");
+        return 1;
+    }
+
+    if (!strcmp(cmdtext, "/placegun", true))
+    {
+        Inventory_PlaceGun(playerid);
         return 1;
     }
 

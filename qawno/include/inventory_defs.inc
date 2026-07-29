@@ -75,6 +75,11 @@ forward DropItemInFront(playerid, const item[], model, quantity = 1);
 forward DestroyDropPile(pileid);
 forward Item_Nearest(playerid, Float:range = INV_DROP_RANGE);
 forward Inventory_PickupDropped(playerid, pileid, slot);
+forward Inventory_PlaceGun(playerid);
+forward Inventory_EquipGun(playerid, slot);
+forward Inv_IsGunItem(const item[]);
+forward Inv_WeaponIdFromModel(model);
+forward Inv_ModelForWeaponId(weaponid);
 
 // Gamemode implements these to react to UI actions.
 forward Inv_OnItemUse(playerid, slot, const item[], model, quantity);
