@@ -151,3 +151,8 @@ Define **before** `#include <inventory>`:
 - Self-contained - no `PlayerInfo`, MySQL, or gamemode-specific items.
 - Include-guarded - safe to include from multiple files.
 - UI matches the modular grid style (5x4 model previews + side actions), not a classic list dialog.
+
+
+<img width="1419" height="695" alt="image" src="https://github.com/user-attachments/assets/2d99c29b-f077-4785-abed-e14c6af5832a" />
+<img width="1503" height="669" alt="image" src="https://github.com/user-attachments/assets/4fc75a7a-1daa-4dcb-a594-d3f755cec1ef" />
+
