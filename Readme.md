@@ -1,5 +1,7 @@
 # open.mp Server - Inventory System
 
+Credits: **Habibi / Janzzzz**
+
 Reusable textdraw inventory for open.mp. Same style as a modular player grid (model previews + Use / Drop / Close), packaged as includes under `qawno/include`.
 
 ## Layout

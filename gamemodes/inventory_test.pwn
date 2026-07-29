@@ -1,11 +1,13 @@
 /*
     Inventory Test Gamemode
-    Textdraw inventory + right panel for nearby dropped items
+    Textdraw inventory + right panel for nearest dropped bag
+
+    Credits: Habibi / Janzzzz
 
     Commands:
       /giveitem   - give Bread + Pistol into inventory
       /dropfront  - spawn a Medkit on the ground in front of you
-      /inv        - open inventory (left = bag, right = nearby drops)
+      /inv        - open inventory (left = bag, right = nearest drops)
 */
 
 #include <open.mp>
@@ -20,7 +22,10 @@
 
 main()
 {
-    print("----------\nInventory Test loaded.\n----------");
+    print("----------");
+    print("Inventory Test loaded.");
+    print("Credits: Habibi / Janzzzz");
+    print("----------");
 }
 
 public OnGameModeInit()
