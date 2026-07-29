@@ -324,6 +324,8 @@ Define **before** `#include <inventory>`:
 | `INV_DROP_RANGE` | `3.0` | Nearest-bag panel range |
 | `INV_DROP_MERGE_RANGE` | `2.0` | Merge drops into same bag |
 | `INV_DROP_FORWARD` | `1.5` | Drop distance in front of player |
+| `INV_NOTIFY_ENABLE` | `1` | Show Received/Removed toast on add/remove |
+| `INV_NOTIFY_DURATION` | `5000` | Toast lifetime (ms) |
 
 ---
 
@@ -331,8 +333,9 @@ Define **before** `#include <inventory>`:
 
 | Function | Description |
 |----------|-------------|
-| `Inventory_Add` / `Remove` / `RemoveEx` | Add / remove items |
-| `Inventory_GetSlot` / `SetSlot` | Read / write one slot |
+| `Inventory_Add` / `Remove` / `RemoveEx` | Add / remove items (toast by default; pass `false` as last arg to silence) |
+| `Inventory_NotifyReceived` / `NotifyRemoved` / `ShowNotification` | Manual toast |
+| `Inventory_GetSlot` / `SetSlot` | Read / write one slot (`SetSlot` is silent — use for DB load) |
 | `Inventory_Count` / `HasItem` / `GetItemID` / `GetFreeID` | Queries |
 | `Inventory_Clear` / `Items` | Wipe / used-slot count |
 | `Inventory_Show` / `Hide` / `IsOpen` | Textdraw UI |

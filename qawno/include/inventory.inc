@@ -108,9 +108,137 @@ static g_InvDragSlot[MAX_PLAYERS];
 static bool:g_InvBuilt[MAX_PLAYERS];
 static bool:g_InvIgnoreEsc[MAX_PLAYERS];
 
+// Item add/remove toast (model + title + name)
+static PlayerText:g_InvNotifPreview[MAX_PLAYERS];
+static PlayerText:g_InvNotifTitle[MAX_PLAYERS];
+static PlayerText:g_InvNotifName[MAX_PLAYERS];
+static bool:g_InvNotifShowing[MAX_PLAYERS];
+static g_InvNotifTimer[MAX_PLAYERS];
+
 #define INV_PANEL_NONE  (0)
 #define INV_PANEL_LEFT  (1)
 #define INV_PANEL_RIGHT (2)
+
+// ---------------------------------------------------------------------------
+// Item notifications (Received / Removed)
+// ---------------------------------------------------------------------------
+
+forward Inv_HideItemNotification(playerid);
+
+stock Inv_HideItemNotification(playerid)
+{
+	if (!IsPlayerConnected(playerid))
+		return 0;
+
+	if (g_InvNotifTimer[playerid])
+	{
+		KillTimer(g_InvNotifTimer[playerid]);
+		g_InvNotifTimer[playerid] = 0;
+	}
+
+	if (g_InvNotifPreview[playerid] != PlayerText:0)
+	{
+		PlayerTextDrawDestroy(playerid, g_InvNotifPreview[playerid]);
+		g_InvNotifPreview[playerid] = PlayerText:0;
+	}
+	if (g_InvNotifTitle[playerid] != PlayerText:0)
+	{
+		PlayerTextDrawDestroy(playerid, g_InvNotifTitle[playerid]);
+		g_InvNotifTitle[playerid] = PlayerText:0;
+	}
+	if (g_InvNotifName[playerid] != PlayerText:0)
+	{
+		PlayerTextDrawDestroy(playerid, g_InvNotifName[playerid]);
+		g_InvNotifName[playerid] = PlayerText:0;
+	}
+	g_InvNotifShowing[playerid] = false;
+	return 1;
+}
+
+stock Inventory_ShowNotification(playerid, const title[], const item[], model, quantity = 1)
+{
+#if !INV_NOTIFY_ENABLE
+	#pragma unused playerid, title, item, model, quantity
+	return 0;
+#else
+	if (!IsPlayerConnected(playerid) || !item[0] || model <= 0)
+		return 0;
+
+	new label[MAX_INVENTORY_ITEM_NAME + 16];
+	if (quantity > 1)
+		format(label, sizeof(label), "%s x%d", item, quantity);
+	else
+		format(label, sizeof(label), "%s", item);
+
+	Inv_HideItemNotification(playerid);
+
+	// Centered under Use/Drop/Close (buttons at X 337)
+	const Float:baseX = 321.0;
+
+	g_InvNotifPreview[playerid] = CreatePlayerTextDraw(playerid, baseX, 260.000000, "Preview_Model");
+	PlayerTextDrawFont(playerid, g_InvNotifPreview[playerid], TEXT_DRAW_FONT_MODEL_PREVIEW);
+	PlayerTextDrawLetterSize(playerid, g_InvNotifPreview[playerid], 0.600000, 2.000000);
+	PlayerTextDrawTextSize(playerid, g_InvNotifPreview[playerid], 32.000000, 35.000000);
+	PlayerTextDrawSetOutline(playerid, g_InvNotifPreview[playerid], 0);
+	PlayerTextDrawSetShadow(playerid, g_InvNotifPreview[playerid], 0);
+	PlayerTextDrawAlignment(playerid, g_InvNotifPreview[playerid], TEXT_DRAW_ALIGN_LEFT);
+	PlayerTextDrawColour(playerid, g_InvNotifPreview[playerid], -1);
+	PlayerTextDrawBackgroundColour(playerid, g_InvNotifPreview[playerid], 54);
+	PlayerTextDrawBoxColour(playerid, g_InvNotifPreview[playerid], 255);
+	PlayerTextDrawUseBox(playerid, g_InvNotifPreview[playerid], false);
+	PlayerTextDrawSetProportional(playerid, g_InvNotifPreview[playerid], true);
+	PlayerTextDrawSetSelectable(playerid, g_InvNotifPreview[playerid], false);
+	PlayerTextDrawSetPreviewModel(playerid, g_InvNotifPreview[playerid], model);
+	PlayerTextDrawSetPreviewRot(playerid, g_InvNotifPreview[playerid], -10.000000, 0.000000, -20.000000, 1.000000);
+	PlayerTextDrawSetPreviewVehicleColours(playerid, g_InvNotifPreview[playerid], 1, 1);
+
+	g_InvNotifTitle[playerid] = CreatePlayerTextDraw(playerid, baseX + 1.0, 261.000000, title);
+	PlayerTextDrawFont(playerid, g_InvNotifTitle[playerid], TEXT_DRAW_FONT_1);
+	PlayerTextDrawLetterSize(playerid, g_InvNotifTitle[playerid], 0.125000, 0.650000);
+	PlayerTextDrawTextSize(playerid, g_InvNotifTitle[playerid], baseX + 30.0, 17.000000);
+	PlayerTextDrawSetOutline(playerid, g_InvNotifTitle[playerid], 0);
+	PlayerTextDrawSetShadow(playerid, g_InvNotifTitle[playerid], 0);
+	PlayerTextDrawAlignment(playerid, g_InvNotifTitle[playerid], TEXT_DRAW_ALIGN_LEFT);
+	PlayerTextDrawColour(playerid, g_InvNotifTitle[playerid], -1);
+	PlayerTextDrawBackgroundColour(playerid, g_InvNotifTitle[playerid], 255);
+	PlayerTextDrawBoxColour(playerid, g_InvNotifTitle[playerid], 50);
+	PlayerTextDrawUseBox(playerid, g_InvNotifTitle[playerid], false);
+	PlayerTextDrawSetProportional(playerid, g_InvNotifTitle[playerid], true);
+	PlayerTextDrawSetSelectable(playerid, g_InvNotifTitle[playerid], false);
+
+	g_InvNotifName[playerid] = CreatePlayerTextDraw(playerid, baseX + 16.0, 287.000000, label);
+	PlayerTextDrawFont(playerid, g_InvNotifName[playerid], TEXT_DRAW_FONT_1);
+	PlayerTextDrawLetterSize(playerid, g_InvNotifName[playerid], 0.125000, 0.650000);
+	PlayerTextDrawTextSize(playerid, g_InvNotifName[playerid], baseX + 31.5, 29.500000);
+	PlayerTextDrawSetOutline(playerid, g_InvNotifName[playerid], 0);
+	PlayerTextDrawSetShadow(playerid, g_InvNotifName[playerid], 0);
+	PlayerTextDrawAlignment(playerid, g_InvNotifName[playerid], TEXT_DRAW_ALIGN_CENTRE);
+	PlayerTextDrawColour(playerid, g_InvNotifName[playerid], -1);
+	PlayerTextDrawBackgroundColour(playerid, g_InvNotifName[playerid], 255);
+	PlayerTextDrawBoxColour(playerid, g_InvNotifName[playerid], 50);
+	PlayerTextDrawUseBox(playerid, g_InvNotifName[playerid], true);
+	PlayerTextDrawSetProportional(playerid, g_InvNotifName[playerid], true);
+	PlayerTextDrawSetSelectable(playerid, g_InvNotifName[playerid], false);
+
+	PlayerTextDrawShow(playerid, g_InvNotifPreview[playerid]);
+	PlayerTextDrawShow(playerid, g_InvNotifTitle[playerid]);
+	PlayerTextDrawShow(playerid, g_InvNotifName[playerid]);
+
+	g_InvNotifShowing[playerid] = true;
+	g_InvNotifTimer[playerid] = SetTimerEx("Inv_HideItemNotification", INV_NOTIFY_DURATION, false, "i", playerid);
+	return 1;
+#endif
+}
+
+stock Inventory_NotifyReceived(playerid, const item[], model, quantity = 1)
+{
+	return Inventory_ShowNotification(playerid, "Received", item, model, quantity);
+}
+
+stock Inventory_NotifyRemoved(playerid, const item[], model, quantity = 1)
+{
+	return Inventory_ShowNotification(playerid, "Removed", item, model, quantity);
+}
 
 // ---------------------------------------------------------------------------
 // Core inventory ops
@@ -141,11 +269,17 @@ stock Inventory_OnPlayerConnect(playerid)
 	g_InvNearPile[playerid] = -1;
 	g_InvDragPanel[playerid] = INV_PANEL_NONE;
 	g_InvDragSlot[playerid] = -1;
+	g_InvNotifPreview[playerid] = PlayerText:0;
+	g_InvNotifTitle[playerid] = PlayerText:0;
+	g_InvNotifName[playerid] = PlayerText:0;
+	g_InvNotifShowing[playerid] = false;
+	g_InvNotifTimer[playerid] = 0;
 	return 1;
 }
 
 stock Inventory_OnPlayerDisconnect(playerid)
 {
+	Inv_HideItemNotification(playerid);
 	if (g_InvOpen[playerid])
 		Inventory_Hide(playerid);
 	Inventory_Clear(playerid);
@@ -334,6 +468,10 @@ stock Inventory_EquipGun(playerid, slot)
 	if (ammo < 1)
 		ammo = 1;
 
+	new itemName[MAX_INVENTORY_ITEM_NAME];
+	new model = InventoryData[playerid][slot][invModel];
+	format(itemName, sizeof(itemName), "%s", InventoryData[playerid][slot][invItem]);
+
 	GivePlayerWeapon(playerid, WEAPON:weaponid, ammo);
 	SetPlayerArmedWeapon(playerid, WEAPON:weaponid);
 
@@ -347,12 +485,13 @@ stock Inventory_EquipGun(playerid, slot)
 	if (g_InvOpen[playerid])
 		Inv_RefreshSlot(playerid, slot);
 	Inv_NotifyChanged(playerid);
+	Inventory_NotifyRemoved(playerid, itemName, model, 1);
 
 	SendClientMessage(playerid, 0x33CCFFFF, "Gun equipped.");
 	return 1;
 }
 
-stock Inventory_Add(playerid, const item[], model, quantity = 1)
+stock Inventory_Add(playerid, const item[], model, quantity = 1, bool:notify = true)
 {
 	if (!IsPlayerConnected(playerid) || quantity < 1 || !item[0])
 		return 0;
@@ -364,6 +503,8 @@ stock Inventory_Add(playerid, const item[], model, quantity = 1)
 		if (g_InvOpen[playerid])
 			Inv_RefreshSlot(playerid, slot);
 		Inv_NotifyChanged(playerid);
+		if (notify)
+			Inventory_NotifyReceived(playerid, item, model, quantity);
 		return 1;
 	}
 
@@ -382,10 +523,12 @@ stock Inventory_Add(playerid, const item[], model, quantity = 1)
 	if (g_InvOpen[playerid])
 		Inv_RefreshSlot(playerid, slot);
 	Inv_NotifyChanged(playerid);
+	if (notify)
+		Inventory_NotifyReceived(playerid, item, model, quantity);
 	return 1;
 }
 
-stock Inventory_RemoveEx(playerid, slot, quantity = 1)
+stock Inventory_RemoveEx(playerid, slot, quantity = 1, bool:notify = true)
 {
 	if (!IsPlayerConnected(playerid) || slot < 0 || slot >= MAX_INVENTORY)
 		return 0;
@@ -393,6 +536,10 @@ stock Inventory_RemoveEx(playerid, slot, quantity = 1)
 		return 0;
 	if (InventoryData[playerid][slot][invQuantity] < quantity)
 		return 0;
+
+	new itemName[MAX_INVENTORY_ITEM_NAME];
+	new model = InventoryData[playerid][slot][invModel];
+	format(itemName, sizeof(itemName), "%s", InventoryData[playerid][slot][invItem]);
 
 	InventoryData[playerid][slot][invQuantity] -= quantity;
 	if (InventoryData[playerid][slot][invQuantity] <= 0)
@@ -408,15 +555,17 @@ stock Inventory_RemoveEx(playerid, slot, quantity = 1)
 	if (g_InvOpen[playerid])
 		Inv_RefreshSlot(playerid, slot);
 	Inv_NotifyChanged(playerid);
+	if (notify)
+		Inventory_NotifyRemoved(playerid, itemName, model, quantity);
 	return 1;
 }
 
-stock Inventory_Remove(playerid, const item[], quantity = 1)
+stock Inventory_Remove(playerid, const item[], quantity = 1, bool:notify = true)
 {
 	new slot = Inventory_GetItemID(playerid, item);
 	if (slot == -1)
 		return 0;
-	return Inventory_RemoveEx(playerid, slot, quantity);
+	return Inventory_RemoveEx(playerid, slot, quantity, notify);
 }
 
 // ---------------------------------------------------------------------------
@@ -846,9 +995,15 @@ stock Inv_MoveBetweenSlots(playerid, fromPanel, fromSlot, toPanel, toSlot)
 	}
 
 	if (fromPanel == INV_PANEL_LEFT && toPanel == INV_PANEL_RIGHT)
+	{
 		CallLocalFunction("Inv_OnItemDrop", "ddsii", playerid, fromSlot, toName, toModel, toQty);
+		Inventory_NotifyRemoved(playerid, toName, toModel, toQty);
+	}
 	else if (fromPanel == INV_PANEL_RIGHT && toPanel == INV_PANEL_LEFT)
+	{
 		CallLocalFunction("Inv_OnItemPickup", "ddsii", playerid, pileid, toName, toModel, toQty);
+		Inventory_NotifyReceived(playerid, toName, toModel, toQty);
+	}
 
 	if (pileid != -1 && DropPiles[pileid][dropExists])
 	{

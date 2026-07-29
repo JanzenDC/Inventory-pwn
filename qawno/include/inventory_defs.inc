@@ -49,10 +49,20 @@
 #if !defined INV_DROP_OBJECT_MODEL
 	#define INV_DROP_OBJECT_MODEL   (11745)
 #endif
+#if !defined INV_NOTIFY_ENABLE
+	#define INV_NOTIFY_ENABLE       (1)
+#endif
+#if !defined INV_NOTIFY_DURATION
+	#define INV_NOTIFY_DURATION     (5000)
+#endif
 
-forward Inventory_Add(playerid, const item[], model, quantity = 1);
-forward Inventory_Remove(playerid, const item[], quantity = 1);
-forward Inventory_RemoveEx(playerid, slot, quantity = 1);
+forward Inventory_Add(playerid, const item[], model, quantity = 1, bool:notify = true);
+forward Inventory_Remove(playerid, const item[], quantity = 1, bool:notify = true);
+forward Inventory_RemoveEx(playerid, slot, quantity = 1, bool:notify = true);
+forward Inventory_ShowNotification(playerid, const title[], const item[], model, quantity = 1);
+forward Inventory_NotifyReceived(playerid, const item[], model, quantity = 1);
+forward Inventory_NotifyRemoved(playerid, const item[], model, quantity = 1);
+forward Inv_HideItemNotification(playerid);
 forward Inventory_Count(playerid, const item[]);
 forward Inventory_HasItem(playerid, const item[]);
 forward Inventory_GetFreeID(playerid);
