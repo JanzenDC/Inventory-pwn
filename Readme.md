@@ -155,4 +155,5 @@ Define **before** `#include <inventory>`:
 
 <img width="1419" height="695" alt="image" src="https://github.com/user-attachments/assets/2d99c29b-f077-4785-abed-e14c6af5832a" />
 <img width="1503" height="669" alt="image" src="https://github.com/user-attachments/assets/4fc75a7a-1daa-4dcb-a594-d3f755cec1ef" />
+<img width="1486" height="695" alt="image" src="https://github.com/user-attachments/assets/c90cae20-6da9-4593-8c10-43c585cc7ed2" />
 
