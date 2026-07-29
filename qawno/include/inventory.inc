@@ -187,6 +187,53 @@ stock Inventory_IsOpen(playerid)
 	return _:g_InvOpen[playerid];
 }
 
+stock Inventory_GetSlot(playerid, slot, item[], itemLen, &model, &quantity)
+{
+	if (slot < 0 || slot >= MAX_INVENTORY || !InventoryData[playerid][slot][invExists])
+	{
+		item[0] = EOS;
+		model = 0;
+		quantity = 0;
+		return 0;
+	}
+	format(item, itemLen, "%s", InventoryData[playerid][slot][invItem]);
+	model = InventoryData[playerid][slot][invModel];
+	quantity = InventoryData[playerid][slot][invQuantity];
+	return 1;
+}
+
+// Direct slot write (used by DB load). quantity <= 0 clears the slot.
+stock Inventory_SetSlot(playerid, slot, const item[], model, quantity)
+{
+	if (slot < 0 || slot >= MAX_INVENTORY)
+		return 0;
+
+	if (quantity <= 0 || !item[0])
+	{
+		InventoryData[playerid][slot][invExists] = false;
+		InventoryData[playerid][slot][invItem][0] = EOS;
+		InventoryData[playerid][slot][invModel] = 0;
+		InventoryData[playerid][slot][invQuantity] = 0;
+	}
+	else
+	{
+		InventoryData[playerid][slot][invExists] = true;
+		InventoryData[playerid][slot][invModel] = model;
+		InventoryData[playerid][slot][invQuantity] = quantity;
+		format(InventoryData[playerid][slot][invItem], MAX_INVENTORY_ITEM_NAME, "%s", item);
+	}
+
+	if (g_InvOpen[playerid])
+		Inv_RefreshSlot(playerid, slot);
+	return 1;
+}
+
+stock Inv_NotifyChanged(playerid)
+{
+	CallLocalFunction("Inv_OnInventoryChanged", "d", playerid);
+	return 1;
+}
+
 stock Inventory_Add(playerid, const item[], model, quantity = 1)
 {
 	if (!IsPlayerConnected(playerid) || quantity < 1 || !item[0])
@@ -198,6 +245,7 @@ stock Inventory_Add(playerid, const item[], model, quantity = 1)
 		InventoryData[playerid][slot][invQuantity] += quantity;
 		if (g_InvOpen[playerid])
 			Inv_RefreshSlot(playerid, slot);
+		Inv_NotifyChanged(playerid);
 		return 1;
 	}
 
@@ -215,6 +263,7 @@ stock Inventory_Add(playerid, const item[], model, quantity = 1)
 
 	if (g_InvOpen[playerid])
 		Inv_RefreshSlot(playerid, slot);
+	Inv_NotifyChanged(playerid);
 	return 1;
 }
 
@@ -240,6 +289,7 @@ stock Inventory_RemoveEx(playerid, slot, quantity = 1)
 
 	if (g_InvOpen[playerid])
 		Inv_RefreshSlot(playerid, slot);
+	Inv_NotifyChanged(playerid);
 	return 1;
 }
 
@@ -696,6 +746,7 @@ stock Inv_MoveBetweenSlots(playerid, fromPanel, fromSlot, toPanel, toSlot)
 	Inv_ClearDrag(playerid);
 	Inv_RefreshPanel(playerid);
 	Inv_RefreshRightPanel(playerid);
+	Inv_NotifyChanged(playerid);
 	return 1;
 }
 

@@ -47,7 +47,7 @@
 	#define INV_SELECT_COLOUR       (0xFFb05748)
 #endif
 #if !defined INV_DROP_OBJECT_MODEL
-	#define INV_DROP_OBJECT_MODEL   (2919)
+	#define INV_DROP_OBJECT_MODEL   (11745)
 #endif
 
 forward Inventory_Add(playerid, const item[], model, quantity = 1);
@@ -64,6 +64,8 @@ forward Inventory_OnPlayerDisconnect(playerid);
 forward Inventory_Show(playerid);
 forward Inventory_Hide(playerid);
 forward Inventory_IsOpen(playerid);
+forward Inventory_GetSlot(playerid, slot, item[], itemLen, &model, &quantity);
+forward Inventory_SetSlot(playerid, slot, const item[], model, quantity);
 forward Inv_ClickPlayerTD(playerid, PlayerText:playertextid);
 forward Inv_HandleEscClose(playerid);
 forward Inventory_OnDialogResponse(playerid, dialogid, response, listitem, const inputtext[]);
@@ -78,3 +80,4 @@ forward Inventory_PickupDropped(playerid, pileid, slot);
 forward Inv_OnItemUse(playerid, slot, const item[], model, quantity);
 forward Inv_OnItemDrop(playerid, slot, const item[], model, quantity);
 forward Inv_OnItemPickup(playerid, pileid, const item[], model, quantity);
+forward Inv_OnInventoryChanged(playerid);

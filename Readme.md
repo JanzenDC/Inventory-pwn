@@ -4,7 +4,32 @@ Credits: **Habibi / Janzzzz**
 
 Reusable textdraw inventory for open.mp. Same style as a modular player grid (model previews + Use / Drop / Close), packaged as includes under `qawno/include`.
 
-## Layout
+## Online (MySQL) test
+
+`gamemodes/inventory_test_online.pwn` saves inventory to MySQL via `a_mysql.inc`.
+
+1. Install the MySQL plugin DLL into `plugins/` and add it in `config.json`:
+
+```json
+"legacy_plugins": ["mysql"]
+```
+
+2. Edit `MYSQL_HOST` / `MYSQL_USER` / `MYSQL_PASS` / `MYSQL_DB` at the top of `inventory_test_online.pwn`.
+3. Create the database (optional - table is auto-created):
+
+```bat
+mysql -u root < scriptfiles\inventory_online.sql
+```
+
+4. Compile: `compile_inventory_online.bat`
+5. Set main script:
+
+```json
+"main_scripts": ["inventory_test_online 1"]
+```
+
+Inventory is keyed by **player name**, loads on connect, auto-saves ~1.2s after changes, and force-saves on disconnect or `/saveinv`.
+
 
 | Path | Purpose |
 |------|---------|
