@@ -4,10 +4,12 @@
  * Credits: Habibi / Janzzzz
  *
  * Left panel  = player inventory (5x4 model previews)
- * Right panel = nearest dropped bag contents
+ * Right panel = dynamic context:
+ *               INV_RIGHT_DROPS    = nearest ground bag
+ *               INV_RIGHT_PLAYER   = another player's inventory (/loot)
+ *               INV_RIGHT_STORAGE  = external buffer (house, vehicle, etc.)
  * Actions     = Use / Drop / Close
  * Move items  = click source slot, then click target slot (left <-> right or rearrange)
- *              (textdraws cannot true-drag; this is click-to-move)
  *
  *   #include <open.mp>
  *   #include <inventory>
@@ -77,8 +79,14 @@ enum E_DROP_PILE
 static DropPiles[MAX_DROPPED_ITEMS][E_DROP_PILE];
 static DropPileSlots[MAX_DROPPED_ITEMS][MAX_INVENTORY][inventoryData];
 
-// Active nearest pile for each player (-1 = none)
+// Active nearest pile for each player (-1 = none) — used in DROPS mode
 static g_InvNearPile[MAX_PLAYERS];
+
+// Right panel context
+static g_InvRightMode[MAX_PLAYERS];
+static g_InvRightId[MAX_PLAYERS];
+static g_InvRightTitle[MAX_PLAYERS][MAX_INV_RIGHT_TITLE];
+static g_InvRightSlots[MAX_PLAYERS][MAX_INVENTORY][inventoryData];
 
 // ---------------------------------------------------------------------------
 // Textdraws
@@ -108,11 +116,15 @@ static g_InvDragSlot[MAX_PLAYERS];
 static bool:g_InvBuilt[MAX_PLAYERS];
 static bool:g_InvIgnoreEsc[MAX_PLAYERS];
 
-// Item add/remove toast (model + title + name)
-static PlayerText:g_InvNotifPreview[MAX_PLAYERS];
-static PlayerText:g_InvNotifTitle[MAX_PLAYERS];
-static PlayerText:g_InvNotifName[MAX_PLAYERS];
-static bool:g_InvNotifShowing[MAX_PLAYERS];
+// Item add/remove toast queue (up to INV_NOTIFY_MAX side by side)
+static PlayerText:g_InvNotifPreview[MAX_PLAYERS][INV_NOTIFY_MAX];
+static PlayerText:g_InvNotifTitle[MAX_PLAYERS][INV_NOTIFY_MAX];
+static PlayerText:g_InvNotifName[MAX_PLAYERS][INV_NOTIFY_MAX];
+static g_InvNotifExpire[MAX_PLAYERS][INV_NOTIFY_MAX];
+static g_InvNotifModel[MAX_PLAYERS][INV_NOTIFY_MAX];
+static g_InvNotifTitleStr[MAX_PLAYERS][INV_NOTIFY_MAX][16];
+static g_InvNotifLabel[MAX_PLAYERS][INV_NOTIFY_MAX][MAX_INVENTORY_ITEM_NAME + 16];
+static g_InvNotifCount[MAX_PLAYERS];
 static g_InvNotifTimer[MAX_PLAYERS];
 
 #define INV_PANEL_NONE  (0)
@@ -120,38 +132,165 @@ static g_InvNotifTimer[MAX_PLAYERS];
 #define INV_PANEL_RIGHT (2)
 
 // ---------------------------------------------------------------------------
-// Item notifications (Received / Removed)
+// Item notifications (Received / Removed) — queue shifts left as oldest expires
 // ---------------------------------------------------------------------------
 
-forward Inv_HideItemNotification(playerid);
-
-stock Inv_HideItemNotification(playerid)
+stock Inv_NotifDestroyBox(playerid, slot)
 {
-	if (!IsPlayerConnected(playerid))
+	if (slot < 0 || slot >= INV_NOTIFY_MAX)
+		return 0;
+	if (g_InvNotifPreview[playerid][slot] != PlayerText:0)
+	{
+		PlayerTextDrawDestroy(playerid, g_InvNotifPreview[playerid][slot]);
+		g_InvNotifPreview[playerid][slot] = PlayerText:0;
+	}
+	if (g_InvNotifTitle[playerid][slot] != PlayerText:0)
+	{
+		PlayerTextDrawDestroy(playerid, g_InvNotifTitle[playerid][slot]);
+		g_InvNotifTitle[playerid][slot] = PlayerText:0;
+	}
+	if (g_InvNotifName[playerid][slot] != PlayerText:0)
+	{
+		PlayerTextDrawDestroy(playerid, g_InvNotifName[playerid][slot]);
+		g_InvNotifName[playerid][slot] = PlayerText:0;
+	}
+	return 1;
+}
+
+stock Inv_NotifCreateBox(playerid, slot, Float:baseX, const title[], const label[], model)
+{
+	new Float:y = INV_NOTIFY_Y;
+
+	g_InvNotifPreview[playerid][slot] = CreatePlayerTextDraw(playerid, baseX, y, "Preview_Model");
+	PlayerTextDrawFont(playerid, g_InvNotifPreview[playerid][slot], TEXT_DRAW_FONT_MODEL_PREVIEW);
+	PlayerTextDrawLetterSize(playerid, g_InvNotifPreview[playerid][slot], 0.600000, 2.000000);
+	PlayerTextDrawTextSize(playerid, g_InvNotifPreview[playerid][slot], 32.000000, 35.000000);
+	PlayerTextDrawSetOutline(playerid, g_InvNotifPreview[playerid][slot], 0);
+	PlayerTextDrawSetShadow(playerid, g_InvNotifPreview[playerid][slot], 0);
+	PlayerTextDrawAlignment(playerid, g_InvNotifPreview[playerid][slot], TEXT_DRAW_ALIGN_LEFT);
+	PlayerTextDrawColour(playerid, g_InvNotifPreview[playerid][slot], -1);
+	PlayerTextDrawBackgroundColour(playerid, g_InvNotifPreview[playerid][slot], 54);
+	PlayerTextDrawBoxColour(playerid, g_InvNotifPreview[playerid][slot], 255);
+	PlayerTextDrawUseBox(playerid, g_InvNotifPreview[playerid][slot], false);
+	PlayerTextDrawSetProportional(playerid, g_InvNotifPreview[playerid][slot], true);
+	PlayerTextDrawSetSelectable(playerid, g_InvNotifPreview[playerid][slot], false);
+	PlayerTextDrawSetPreviewModel(playerid, g_InvNotifPreview[playerid][slot], model);
+	PlayerTextDrawSetPreviewRot(playerid, g_InvNotifPreview[playerid][slot], -10.000000, 0.000000, -20.000000, 1.000000);
+	PlayerTextDrawSetPreviewVehicleColours(playerid, g_InvNotifPreview[playerid][slot], 1, 1);
+
+	g_InvNotifTitle[playerid][slot] = CreatePlayerTextDraw(playerid, baseX + 1.0, y + 1.0, title);
+	PlayerTextDrawFont(playerid, g_InvNotifTitle[playerid][slot], TEXT_DRAW_FONT_1);
+	PlayerTextDrawLetterSize(playerid, g_InvNotifTitle[playerid][slot], 0.125000, 0.650000);
+	PlayerTextDrawTextSize(playerid, g_InvNotifTitle[playerid][slot], baseX + 30.0, 17.000000);
+	PlayerTextDrawSetOutline(playerid, g_InvNotifTitle[playerid][slot], 0);
+	PlayerTextDrawSetShadow(playerid, g_InvNotifTitle[playerid][slot], 0);
+	PlayerTextDrawAlignment(playerid, g_InvNotifTitle[playerid][slot], TEXT_DRAW_ALIGN_LEFT);
+	PlayerTextDrawColour(playerid, g_InvNotifTitle[playerid][slot], -1);
+	PlayerTextDrawBackgroundColour(playerid, g_InvNotifTitle[playerid][slot], 255);
+	PlayerTextDrawBoxColour(playerid, g_InvNotifTitle[playerid][slot], 50);
+	PlayerTextDrawUseBox(playerid, g_InvNotifTitle[playerid][slot], false);
+	PlayerTextDrawSetProportional(playerid, g_InvNotifTitle[playerid][slot], true);
+	PlayerTextDrawSetSelectable(playerid, g_InvNotifTitle[playerid][slot], false);
+
+	g_InvNotifName[playerid][slot] = CreatePlayerTextDraw(playerid, baseX + 16.0, y + 27.0, label);
+	PlayerTextDrawFont(playerid, g_InvNotifName[playerid][slot], TEXT_DRAW_FONT_1);
+	PlayerTextDrawLetterSize(playerid, g_InvNotifName[playerid][slot], 0.125000, 0.650000);
+	PlayerTextDrawTextSize(playerid, g_InvNotifName[playerid][slot], baseX + 31.5, 29.500000);
+	PlayerTextDrawSetOutline(playerid, g_InvNotifName[playerid][slot], 0);
+	PlayerTextDrawSetShadow(playerid, g_InvNotifName[playerid][slot], 0);
+	PlayerTextDrawAlignment(playerid, g_InvNotifName[playerid][slot], TEXT_DRAW_ALIGN_CENTRE);
+	PlayerTextDrawColour(playerid, g_InvNotifName[playerid][slot], -1);
+	PlayerTextDrawBackgroundColour(playerid, g_InvNotifName[playerid][slot], 255);
+	PlayerTextDrawBoxColour(playerid, g_InvNotifName[playerid][slot], 50);
+	PlayerTextDrawUseBox(playerid, g_InvNotifName[playerid][slot], true);
+	PlayerTextDrawSetProportional(playerid, g_InvNotifName[playerid][slot], true);
+	PlayerTextDrawSetSelectable(playerid, g_InvNotifName[playerid][slot], false);
+
+	PlayerTextDrawShow(playerid, g_InvNotifPreview[playerid][slot]);
+	PlayerTextDrawShow(playerid, g_InvNotifTitle[playerid][slot]);
+	PlayerTextDrawShow(playerid, g_InvNotifName[playerid][slot]);
+	return 1;
+}
+
+stock Inv_NotifRedraw(playerid)
+{
+	new i, count = g_InvNotifCount[playerid];
+	new Float:startX, Float:baseX;
+
+	for (i = 0; i < INV_NOTIFY_MAX; i++)
+		Inv_NotifDestroyBox(playerid, i);
+
+	if (count < 1)
 		return 0;
 
+	startX = INV_NOTIFY_CENTER_X - (float(count) * INV_NOTIFY_SPACING) / 2.0;
+	for (i = 0; i < count; i++)
+	{
+		baseX = startX + float(i) * INV_NOTIFY_SPACING;
+		Inv_NotifCreateBox(playerid, i, baseX,
+			g_InvNotifTitleStr[playerid][i],
+			g_InvNotifLabel[playerid][i],
+			g_InvNotifModel[playerid][i]);
+	}
+	return 1;
+}
+
+stock Inv_NotifSchedule(playerid)
+{
 	if (g_InvNotifTimer[playerid])
 	{
 		KillTimer(g_InvNotifTimer[playerid]);
 		g_InvNotifTimer[playerid] = 0;
 	}
+	if (g_InvNotifCount[playerid] < 1)
+		return 0;
 
-	if (g_InvNotifPreview[playerid] != PlayerText:0)
+	new wait = g_InvNotifExpire[playerid][0] - GetTickCount();
+	if (wait < 1)
+		wait = 1;
+	g_InvNotifTimer[playerid] = SetTimerEx("Inv_NotifOnExpire", wait, false, "i", playerid);
+	return 1;
+}
+
+stock Inv_NotifPopFront(playerid)
+{
+	new i, count = g_InvNotifCount[playerid];
+	if (count < 1)
+		return 0;
+
+	for (i = 0; i < count - 1; i++)
 	{
-		PlayerTextDrawDestroy(playerid, g_InvNotifPreview[playerid]);
-		g_InvNotifPreview[playerid] = PlayerText:0;
+		g_InvNotifExpire[playerid][i] = g_InvNotifExpire[playerid][i + 1];
+		g_InvNotifModel[playerid][i] = g_InvNotifModel[playerid][i + 1];
+		format(g_InvNotifTitleStr[playerid][i], 16, "%s", g_InvNotifTitleStr[playerid][i + 1]);
+		format(g_InvNotifLabel[playerid][i], MAX_INVENTORY_ITEM_NAME + 16, "%s", g_InvNotifLabel[playerid][i + 1]);
 	}
-	if (g_InvNotifTitle[playerid] != PlayerText:0)
+	g_InvNotifCount[playerid]--;
+	Inv_NotifRedraw(playerid);
+	Inv_NotifSchedule(playerid);
+	return 1;
+}
+
+public Inv_NotifOnExpire(playerid)
+{
+	g_InvNotifTimer[playerid] = 0;
+	if (!IsPlayerConnected(playerid))
+		return 0;
+	while (g_InvNotifCount[playerid] > 0 && g_InvNotifExpire[playerid][0] <= GetTickCount())
+		Inv_NotifPopFront(playerid);
+	return 1;
+}
+
+stock Inv_HideItemNotification(playerid)
+{
+	if (g_InvNotifTimer[playerid])
 	{
-		PlayerTextDrawDestroy(playerid, g_InvNotifTitle[playerid]);
-		g_InvNotifTitle[playerid] = PlayerText:0;
+		KillTimer(g_InvNotifTimer[playerid]);
+		g_InvNotifTimer[playerid] = 0;
 	}
-	if (g_InvNotifName[playerid] != PlayerText:0)
-	{
-		PlayerTextDrawDestroy(playerid, g_InvNotifName[playerid]);
-		g_InvNotifName[playerid] = PlayerText:0;
-	}
-	g_InvNotifShowing[playerid] = false;
+	for (new i = 0; i < INV_NOTIFY_MAX; i++)
+		Inv_NotifDestroyBox(playerid, i);
+	g_InvNotifCount[playerid] = 0;
 	return 1;
 }
 
@@ -170,62 +309,19 @@ stock Inventory_ShowNotification(playerid, const title[], const item[], model, q
 	else
 		format(label, sizeof(label), "%s", item);
 
-	Inv_HideItemNotification(playerid);
+	// Queue full → drop oldest so the row shifts left
+	if (g_InvNotifCount[playerid] >= INV_NOTIFY_MAX)
+		Inv_NotifPopFront(playerid);
 
-	// Centered under Use/Drop/Close (buttons at X 337)
-	const Float:baseX = 321.0;
+	new slot = g_InvNotifCount[playerid];
+	g_InvNotifExpire[playerid][slot] = GetTickCount() + INV_NOTIFY_DURATION;
+	g_InvNotifModel[playerid][slot] = model;
+	format(g_InvNotifTitleStr[playerid][slot], 16, "%s", title);
+	format(g_InvNotifLabel[playerid][slot], MAX_INVENTORY_ITEM_NAME + 16, "%s", label);
+	g_InvNotifCount[playerid]++;
 
-	g_InvNotifPreview[playerid] = CreatePlayerTextDraw(playerid, baseX, 260.000000, "Preview_Model");
-	PlayerTextDrawFont(playerid, g_InvNotifPreview[playerid], TEXT_DRAW_FONT_MODEL_PREVIEW);
-	PlayerTextDrawLetterSize(playerid, g_InvNotifPreview[playerid], 0.600000, 2.000000);
-	PlayerTextDrawTextSize(playerid, g_InvNotifPreview[playerid], 32.000000, 35.000000);
-	PlayerTextDrawSetOutline(playerid, g_InvNotifPreview[playerid], 0);
-	PlayerTextDrawSetShadow(playerid, g_InvNotifPreview[playerid], 0);
-	PlayerTextDrawAlignment(playerid, g_InvNotifPreview[playerid], TEXT_DRAW_ALIGN_LEFT);
-	PlayerTextDrawColour(playerid, g_InvNotifPreview[playerid], -1);
-	PlayerTextDrawBackgroundColour(playerid, g_InvNotifPreview[playerid], 54);
-	PlayerTextDrawBoxColour(playerid, g_InvNotifPreview[playerid], 255);
-	PlayerTextDrawUseBox(playerid, g_InvNotifPreview[playerid], false);
-	PlayerTextDrawSetProportional(playerid, g_InvNotifPreview[playerid], true);
-	PlayerTextDrawSetSelectable(playerid, g_InvNotifPreview[playerid], false);
-	PlayerTextDrawSetPreviewModel(playerid, g_InvNotifPreview[playerid], model);
-	PlayerTextDrawSetPreviewRot(playerid, g_InvNotifPreview[playerid], -10.000000, 0.000000, -20.000000, 1.000000);
-	PlayerTextDrawSetPreviewVehicleColours(playerid, g_InvNotifPreview[playerid], 1, 1);
-
-	g_InvNotifTitle[playerid] = CreatePlayerTextDraw(playerid, baseX + 1.0, 261.000000, title);
-	PlayerTextDrawFont(playerid, g_InvNotifTitle[playerid], TEXT_DRAW_FONT_1);
-	PlayerTextDrawLetterSize(playerid, g_InvNotifTitle[playerid], 0.125000, 0.650000);
-	PlayerTextDrawTextSize(playerid, g_InvNotifTitle[playerid], baseX + 30.0, 17.000000);
-	PlayerTextDrawSetOutline(playerid, g_InvNotifTitle[playerid], 0);
-	PlayerTextDrawSetShadow(playerid, g_InvNotifTitle[playerid], 0);
-	PlayerTextDrawAlignment(playerid, g_InvNotifTitle[playerid], TEXT_DRAW_ALIGN_LEFT);
-	PlayerTextDrawColour(playerid, g_InvNotifTitle[playerid], -1);
-	PlayerTextDrawBackgroundColour(playerid, g_InvNotifTitle[playerid], 255);
-	PlayerTextDrawBoxColour(playerid, g_InvNotifTitle[playerid], 50);
-	PlayerTextDrawUseBox(playerid, g_InvNotifTitle[playerid], false);
-	PlayerTextDrawSetProportional(playerid, g_InvNotifTitle[playerid], true);
-	PlayerTextDrawSetSelectable(playerid, g_InvNotifTitle[playerid], false);
-
-	g_InvNotifName[playerid] = CreatePlayerTextDraw(playerid, baseX + 16.0, 287.000000, label);
-	PlayerTextDrawFont(playerid, g_InvNotifName[playerid], TEXT_DRAW_FONT_1);
-	PlayerTextDrawLetterSize(playerid, g_InvNotifName[playerid], 0.125000, 0.650000);
-	PlayerTextDrawTextSize(playerid, g_InvNotifName[playerid], baseX + 31.5, 29.500000);
-	PlayerTextDrawSetOutline(playerid, g_InvNotifName[playerid], 0);
-	PlayerTextDrawSetShadow(playerid, g_InvNotifName[playerid], 0);
-	PlayerTextDrawAlignment(playerid, g_InvNotifName[playerid], TEXT_DRAW_ALIGN_CENTRE);
-	PlayerTextDrawColour(playerid, g_InvNotifName[playerid], -1);
-	PlayerTextDrawBackgroundColour(playerid, g_InvNotifName[playerid], 255);
-	PlayerTextDrawBoxColour(playerid, g_InvNotifName[playerid], 50);
-	PlayerTextDrawUseBox(playerid, g_InvNotifName[playerid], true);
-	PlayerTextDrawSetProportional(playerid, g_InvNotifName[playerid], true);
-	PlayerTextDrawSetSelectable(playerid, g_InvNotifName[playerid], false);
-
-	PlayerTextDrawShow(playerid, g_InvNotifPreview[playerid]);
-	PlayerTextDrawShow(playerid, g_InvNotifTitle[playerid]);
-	PlayerTextDrawShow(playerid, g_InvNotifName[playerid]);
-
-	g_InvNotifShowing[playerid] = true;
-	g_InvNotifTimer[playerid] = SetTimerEx("Inv_HideItemNotification", INV_NOTIFY_DURATION, false, "i", playerid);
+	Inv_NotifRedraw(playerid);
+	Inv_NotifSchedule(playerid);
 	return 1;
 #endif
 }
@@ -269,11 +365,22 @@ stock Inventory_OnPlayerConnect(playerid)
 	g_InvNearPile[playerid] = -1;
 	g_InvDragPanel[playerid] = INV_PANEL_NONE;
 	g_InvDragSlot[playerid] = -1;
-	g_InvNotifPreview[playerid] = PlayerText:0;
-	g_InvNotifTitle[playerid] = PlayerText:0;
-	g_InvNotifName[playerid] = PlayerText:0;
-	g_InvNotifShowing[playerid] = false;
+	g_InvRightMode[playerid] = INV_RIGHT_DROPS;
+	g_InvRightId[playerid] = -1;
+	g_InvRightTitle[playerid][0] = EOS;
+	Inventory_Right_Clear(playerid);
+	g_InvNotifCount[playerid] = 0;
 	g_InvNotifTimer[playerid] = 0;
+	for (new i = 0; i < INV_NOTIFY_MAX; i++)
+	{
+		g_InvNotifPreview[playerid][i] = PlayerText:0;
+		g_InvNotifTitle[playerid][i] = PlayerText:0;
+		g_InvNotifName[playerid][i] = PlayerText:0;
+		g_InvNotifExpire[playerid][i] = 0;
+		g_InvNotifModel[playerid][i] = 0;
+		g_InvNotifTitleStr[playerid][i][0] = EOS;
+		g_InvNotifLabel[playerid][i][0] = EOS;
+	}
 	return 1;
 }
 
@@ -282,7 +389,23 @@ stock Inventory_OnPlayerDisconnect(playerid)
 	Inv_HideItemNotification(playerid);
 	if (g_InvOpen[playerid])
 		Inventory_Hide(playerid);
+
+	// Close anyone who was looting this player
+	for (new i = 0; i < MAX_PLAYERS; i++)
+	{
+		if (i == playerid || !IsPlayerConnected(i))
+			continue;
+		if (g_InvRightMode[i] == INV_RIGHT_PLAYER && g_InvRightId[i] == playerid)
+		{
+			if (g_InvOpen[i])
+				Inventory_Hide(i);
+			Inventory_ClearRightContext(i);
+			SendClientMessage(i, 0xFFFF00AA, "Loot target disconnected.");
+		}
+	}
+
 	Inventory_Clear(playerid);
+	Inventory_ClearRightContext(playerid);
 	return 1;
 }
 
@@ -819,7 +942,343 @@ stock Inventory_PickupDropped(playerid, pileid, slot)
 	return 1;
 }
 
-// Right panel shows ONLY the nearest bag's contents.
+// ---------------------------------------------------------------------------
+// Right panel context (drops / player loot / external storage)
+// ---------------------------------------------------------------------------
+
+stock Inventory_Right_Clear(playerid)
+{
+	for (new slot = 0; slot < MAX_INVENTORY; slot++)
+	{
+		g_InvRightSlots[playerid][slot][invExists] = false;
+		g_InvRightSlots[playerid][slot][invItem][0] = EOS;
+		g_InvRightSlots[playerid][slot][invModel] = 0;
+		g_InvRightSlots[playerid][slot][invQuantity] = 0;
+	}
+	return 1;
+}
+
+stock Inventory_Right_SetSlot(playerid, slot, const item[], model, quantity)
+{
+	if (slot < 0 || slot >= MAX_INVENTORY)
+		return 0;
+
+	if (quantity <= 0 || !item[0])
+	{
+		g_InvRightSlots[playerid][slot][invExists] = false;
+		g_InvRightSlots[playerid][slot][invItem][0] = EOS;
+		g_InvRightSlots[playerid][slot][invModel] = 0;
+		g_InvRightSlots[playerid][slot][invQuantity] = 0;
+	}
+	else
+	{
+		g_InvRightSlots[playerid][slot][invExists] = true;
+		g_InvRightSlots[playerid][slot][invModel] = model;
+		g_InvRightSlots[playerid][slot][invQuantity] = quantity;
+		format(g_InvRightSlots[playerid][slot][invItem], MAX_INVENTORY_ITEM_NAME, "%s", item);
+	}
+
+	if (g_InvOpen[playerid] && g_InvRightMode[playerid] == INV_RIGHT_STORAGE)
+		Inv_RefreshRightSlot(playerid, slot);
+	return 1;
+}
+
+stock Inventory_Right_GetSlot(playerid, slot, item[], itemLen, &model, &quantity)
+{
+	if (slot < 0 || slot >= MAX_INVENTORY || !g_InvRightSlots[playerid][slot][invExists])
+	{
+		item[0] = EOS;
+		model = 0;
+		quantity = 0;
+		return 0;
+	}
+	format(item, itemLen, "%s", g_InvRightSlots[playerid][slot][invItem]);
+	model = g_InvRightSlots[playerid][slot][invModel];
+	quantity = g_InvRightSlots[playerid][slot][invQuantity];
+	return 1;
+}
+
+stock Inventory_SetRightContext(playerid, mode, id = -1, const title[] = "")
+{
+	if (!IsPlayerConnected(playerid))
+		return 0;
+	if (mode != INV_RIGHT_DROPS && mode != INV_RIGHT_PLAYER && mode != INV_RIGHT_STORAGE)
+		return 0;
+
+	if (mode == INV_RIGHT_PLAYER)
+	{
+		if (id < 0 || id == playerid || !IsPlayerConnected(id))
+			return 0;
+	}
+
+	g_InvRightMode[playerid] = mode;
+	g_InvRightId[playerid] = id;
+
+	if (title[0])
+		format(g_InvRightTitle[playerid], MAX_INV_RIGHT_TITLE, "%s", title);
+	else
+	{
+		switch (mode)
+		{
+			case INV_RIGHT_PLAYER:
+			{
+				new name[MAX_PLAYER_NAME];
+				GetPlayerName(id, name, sizeof(name));
+				format(g_InvRightTitle[playerid], MAX_INV_RIGHT_TITLE, "%s's Loot", name);
+			}
+			case INV_RIGHT_STORAGE:
+				format(g_InvRightTitle[playerid], MAX_INV_RIGHT_TITLE, "Storage");
+			default:
+				format(g_InvRightTitle[playerid], MAX_INV_RIGHT_TITLE, "Nearby Drops");
+		}
+	}
+
+	Inv_ClearDrag(playerid);
+	if (g_InvOpen[playerid])
+		Inv_RefreshRightPanel(playerid);
+	return 1;
+}
+
+stock Inventory_ClearRightContext(playerid)
+{
+	g_InvRightMode[playerid] = INV_RIGHT_DROPS;
+	g_InvRightId[playerid] = -1;
+	g_InvRightTitle[playerid][0] = EOS;
+	if (g_InvOpen[playerid])
+		Inv_RefreshRightPanel(playerid);
+	return 1;
+}
+
+stock Inventory_GetRightContext(playerid, &mode, &id)
+{
+	mode = g_InvRightMode[playerid];
+	id = g_InvRightId[playerid];
+	return 1;
+}
+
+stock Inventory_FindLootTarget(playerid, Float:range = INV_LOOT_RANGE)
+{
+	if (!IsPlayerConnected(playerid))
+		return INVALID_PLAYER_ID;
+
+	new Float:px, Float:py, Float:pz;
+	GetPlayerPos(playerid, px, py, pz);
+	new interior = GetPlayerInterior(playerid);
+	new world = GetPlayerVirtualWorld(playerid);
+
+	new best = INVALID_PLAYER_ID;
+	new Float:bestDist = range + 1.0;
+
+	for (new i = 0; i < MAX_PLAYERS; i++)
+	{
+		if (i == playerid || !IsPlayerConnected(i))
+			continue;
+		if (GetPlayerInterior(i) != interior || GetPlayerVirtualWorld(i) != world)
+			continue;
+
+		new Float:x, Float:y, Float:z;
+		GetPlayerPos(i, x, y, z);
+		new Float:dist = Inv_Dist3D(px, py, pz, x, y, z);
+		if (dist <= range && dist < bestDist)
+		{
+			bestDist = dist;
+			best = i;
+		}
+	}
+	return best;
+}
+
+stock Inventory_OpenLoot(playerid, targetid)
+{
+	if (!Inventory_SetRightContext(playerid, INV_RIGHT_PLAYER, targetid))
+		return 0;
+	return Inventory_Show(playerid);
+}
+
+stock Inventory_OpenStorage(playerid, storageid, const title[] = "Storage")
+{
+	if (!Inventory_SetRightContext(playerid, INV_RIGHT_STORAGE, storageid, title))
+		return 0;
+	return Inventory_Show(playerid);
+}
+
+stock Inv_RightEnsureReady(playerid)
+{
+	switch (g_InvRightMode[playerid])
+	{
+		case INV_RIGHT_PLAYER:
+		{
+			new tid = g_InvRightId[playerid];
+			if (tid < 0 || !IsPlayerConnected(tid))
+			{
+				Inventory_ClearRightContext(playerid);
+				return 0;
+			}
+			return 1;
+		}
+		case INV_RIGHT_STORAGE:
+			return 1;
+		default:
+		{
+			Inv_GatherNearbyDrops(playerid);
+			return 1;
+		}
+	}
+}
+
+stock bool:Inv_RightSlotExists(playerid, slot)
+{
+	if (slot < 0 || slot >= MAX_INVENTORY)
+		return false;
+
+	switch (g_InvRightMode[playerid])
+	{
+		case INV_RIGHT_PLAYER:
+		{
+			new tid = g_InvRightId[playerid];
+			return (tid >= 0 && IsPlayerConnected(tid) && InventoryData[tid][slot][invExists]
+				&& InventoryData[tid][slot][invQuantity] > 0);
+		}
+		case INV_RIGHT_STORAGE:
+			return (g_InvRightSlots[playerid][slot][invExists] && g_InvRightSlots[playerid][slot][invQuantity] > 0);
+		default:
+		{
+			new pileid = g_InvNearPile[playerid];
+			return (pileid != -1 && DropPiles[pileid][dropExists]
+				&& DropPileSlots[pileid][slot][invExists] && DropPileSlots[pileid][slot][invQuantity] > 0);
+		}
+	}
+}
+
+stock Inv_RightReadSlot(playerid, slot, &bool:exists, &model, &qty, name[], nameLen)
+{
+	exists = false;
+	model = 0;
+	qty = 0;
+	name[0] = EOS;
+
+	if (slot < 0 || slot >= MAX_INVENTORY)
+		return 0;
+
+	switch (g_InvRightMode[playerid])
+	{
+		case INV_RIGHT_PLAYER:
+		{
+			new tid = g_InvRightId[playerid];
+			if (tid < 0 || !IsPlayerConnected(tid) || !InventoryData[tid][slot][invExists])
+				return 0;
+			exists = true;
+			model = InventoryData[tid][slot][invModel];
+			qty = InventoryData[tid][slot][invQuantity];
+			format(name, nameLen, "%s", InventoryData[tid][slot][invItem]);
+			return 1;
+		}
+		case INV_RIGHT_STORAGE:
+		{
+			if (!g_InvRightSlots[playerid][slot][invExists])
+				return 0;
+			exists = true;
+			model = g_InvRightSlots[playerid][slot][invModel];
+			qty = g_InvRightSlots[playerid][slot][invQuantity];
+			format(name, nameLen, "%s", g_InvRightSlots[playerid][slot][invItem]);
+			return 1;
+		}
+		default:
+		{
+			new pileid = g_InvNearPile[playerid];
+			if (pileid < 0 || !DropPiles[pileid][dropExists] || !DropPileSlots[pileid][slot][invExists])
+				return 0;
+			exists = true;
+			model = DropPileSlots[pileid][slot][invModel];
+			qty = DropPileSlots[pileid][slot][invQuantity];
+			format(name, nameLen, "%s", DropPileSlots[pileid][slot][invItem]);
+			return 1;
+		}
+	}
+}
+
+stock Inv_RightWriteSlot(playerid, slot, bool:exists, model, qty, const name[])
+{
+	if (slot < 0 || slot >= MAX_INVENTORY)
+		return 0;
+
+	switch (g_InvRightMode[playerid])
+	{
+		case INV_RIGHT_PLAYER:
+		{
+			new tid = g_InvRightId[playerid];
+			if (tid < 0 || !IsPlayerConnected(tid))
+				return 0;
+			if (!exists || qty <= 0 || !name[0])
+			{
+				InventoryData[tid][slot][invExists] = false;
+				InventoryData[tid][slot][invItem][0] = EOS;
+				InventoryData[tid][slot][invModel] = 0;
+				InventoryData[tid][slot][invQuantity] = 0;
+			}
+			else
+			{
+				InventoryData[tid][slot][invExists] = true;
+				InventoryData[tid][slot][invModel] = model;
+				InventoryData[tid][slot][invQuantity] = qty;
+				format(InventoryData[tid][slot][invItem], MAX_INVENTORY_ITEM_NAME, "%s", name);
+			}
+			if (g_InvOpen[tid])
+				Inv_RefreshSlot(tid, slot);
+			CallLocalFunction("Inv_OnInventoryChanged", "d", tid);
+			return 1;
+		}
+		case INV_RIGHT_STORAGE:
+		{
+			if (!exists || qty <= 0 || !name[0])
+			{
+				g_InvRightSlots[playerid][slot][invExists] = false;
+				g_InvRightSlots[playerid][slot][invItem][0] = EOS;
+				g_InvRightSlots[playerid][slot][invModel] = 0;
+				g_InvRightSlots[playerid][slot][invQuantity] = 0;
+			}
+			else
+			{
+				g_InvRightSlots[playerid][slot][invExists] = true;
+				g_InvRightSlots[playerid][slot][invModel] = model;
+				g_InvRightSlots[playerid][slot][invQuantity] = qty;
+				format(g_InvRightSlots[playerid][slot][invItem], MAX_INVENTORY_ITEM_NAME, "%s", name);
+			}
+			return 1;
+		}
+		default:
+		{
+			new pileid = g_InvNearPile[playerid];
+			if (pileid < 0 || !DropPiles[pileid][dropExists])
+				return 0;
+			if (!exists || qty <= 0 || !name[0])
+			{
+				DropPileSlots[pileid][slot][invExists] = false;
+				DropPileSlots[pileid][slot][invItem][0] = EOS;
+				DropPileSlots[pileid][slot][invModel] = 0;
+				DropPileSlots[pileid][slot][invQuantity] = 0;
+			}
+			else
+			{
+				DropPileSlots[pileid][slot][invExists] = true;
+				DropPileSlots[pileid][slot][invModel] = model;
+				DropPileSlots[pileid][slot][invQuantity] = qty;
+				format(DropPileSlots[pileid][slot][invItem], MAX_INVENTORY_ITEM_NAME, "%s", name);
+			}
+			return 1;
+		}
+	}
+}
+
+stock Inv_RightFindFree(playerid)
+{
+	for (new slot = 0; slot < MAX_INVENTORY; slot++)
+		if (!Inv_RightSlotExists(playerid, slot))
+			return slot;
+	return -1;
+}
+
+// Right panel shows content for the active context mode.
 stock Inv_GatherNearbyDrops(playerid)
 {
 	g_InvNearPile[playerid] = Item_Nearest(playerid, INV_DROP_RANGE);
@@ -863,7 +1322,7 @@ stock Inv_SetDrag(playerid, panel, slot)
 	else if (panel == INV_PANEL_RIGHT)
 		Inv_RefreshRightSlot(playerid, slot);
 
-	SendClientMessage(playerid, 0xAAAAAAFF, "Selected - click another slot to move (left bag or right ground).");
+	SendClientMessage(playerid, 0xAAAAAAFF, "Selected - click another slot to move.");
 	return 1;
 }
 
@@ -881,17 +1340,21 @@ stock DropPile_GetOrCreateNearPlayer(playerid)
 	return DropPile_Create(x, y, z, GetPlayerInterior(playerid), GetPlayerVirtualWorld(playerid));
 }
 
-// Move / swap / stack between any two slots (left inventory or right bag).
+// Move / swap / stack between any two slots (left inventory or right context).
 stock Inv_MoveBetweenSlots(playerid, fromPanel, fromSlot, toPanel, toSlot)
 {
 	if (fromPanel == toPanel && fromSlot == toSlot)
 		return 0;
 
+	if (!Inv_RightEnsureReady(playerid) && (fromPanel == INV_PANEL_RIGHT || toPanel == INV_PANEL_RIGHT))
+		return 0;
+
 	new bool:fromExists, fromModel, fromQty, fromName[MAX_INVENTORY_ITEM_NAME];
 	new bool:toExists, toModel, toQty, toName[MAX_INVENTORY_ITEM_NAME];
+	new mode = g_InvRightMode[playerid];
 	new pileid = g_InvNearPile[playerid];
 
-	if (fromPanel == INV_PANEL_RIGHT || toPanel == INV_PANEL_RIGHT)
+	if (mode == INV_RIGHT_DROPS && (fromPanel == INV_PANEL_RIGHT || toPanel == INV_PANEL_RIGHT))
 	{
 		if (toPanel == INV_PANEL_RIGHT && (pileid < 0 || !DropPiles[pileid][dropExists]))
 		{
@@ -915,12 +1378,8 @@ stock Inv_MoveBetweenSlots(playerid, fromPanel, fromSlot, toPanel, toSlot)
 	}
 	else
 	{
-		if (fromSlot < 0 || fromSlot >= MAX_INVENTORY || !DropPileSlots[pileid][fromSlot][invExists])
+		if (!Inv_RightReadSlot(playerid, fromSlot, fromExists, fromModel, fromQty, fromName, sizeof(fromName)))
 			return 0;
-		fromExists = true;
-		fromModel = DropPileSlots[pileid][fromSlot][invModel];
-		fromQty = DropPileSlots[pileid][fromSlot][invQuantity];
-		format(fromName, sizeof(fromName), "%s", DropPileSlots[pileid][fromSlot][invItem]);
 	}
 
 	if (toPanel == INV_PANEL_LEFT)
@@ -932,10 +1391,7 @@ stock Inv_MoveBetweenSlots(playerid, fromPanel, fromSlot, toPanel, toSlot)
 	}
 	else
 	{
-		toExists = DropPileSlots[pileid][toSlot][invExists];
-		toModel = DropPileSlots[pileid][toSlot][invModel];
-		toQty = DropPileSlots[pileid][toSlot][invQuantity];
-		format(toName, sizeof(toName), "%s", DropPileSlots[pileid][toSlot][invItem]);
+		Inv_RightReadSlot(playerid, toSlot, toExists, toModel, toQty, toName, sizeof(toName));
 	}
 
 	// Stack same items onto target
@@ -971,13 +1427,8 @@ stock Inv_MoveBetweenSlots(playerid, fromPanel, fromSlot, toPanel, toSlot)
 		InventoryData[playerid][fromSlot][invQuantity] = fromQty;
 		format(InventoryData[playerid][fromSlot][invItem], MAX_INVENTORY_ITEM_NAME, "%s", fromName);
 	}
-	else
-	{
-		DropPileSlots[pileid][fromSlot][invExists] = fromExists;
-		DropPileSlots[pileid][fromSlot][invModel] = fromModel;
-		DropPileSlots[pileid][fromSlot][invQuantity] = fromQty;
-		format(DropPileSlots[pileid][fromSlot][invItem], MAX_INVENTORY_ITEM_NAME, "%s", fromName);
-	}
+	else if (!Inv_RightWriteSlot(playerid, fromSlot, fromExists, fromModel, fromQty, fromName))
+		return 0;
 
 	if (toPanel == INV_PANEL_LEFT)
 	{
@@ -986,26 +1437,55 @@ stock Inv_MoveBetweenSlots(playerid, fromPanel, fromSlot, toPanel, toSlot)
 		InventoryData[playerid][toSlot][invQuantity] = toQty;
 		format(InventoryData[playerid][toSlot][invItem], MAX_INVENTORY_ITEM_NAME, "%s", toName);
 	}
-	else
-	{
-		DropPileSlots[pileid][toSlot][invExists] = toExists;
-		DropPileSlots[pileid][toSlot][invModel] = toModel;
-		DropPileSlots[pileid][toSlot][invQuantity] = toQty;
-		format(DropPileSlots[pileid][toSlot][invItem], MAX_INVENTORY_ITEM_NAME, "%s", toName);
-	}
+	else if (!Inv_RightWriteSlot(playerid, toSlot, toExists, toModel, toQty, toName))
+		return 0;
 
 	if (fromPanel == INV_PANEL_LEFT && toPanel == INV_PANEL_RIGHT)
 	{
-		CallLocalFunction("Inv_OnItemDrop", "ddsii", playerid, fromSlot, toName, toModel, toQty);
-		Inventory_NotifyRemoved(playerid, toName, toModel, toQty);
+		if (mode == INV_RIGHT_DROPS)
+		{
+			CallLocalFunction("Inv_OnItemDrop", "ddsii", playerid, fromSlot, toName, toModel, toQty);
+			Inventory_NotifyRemoved(playerid, toName, toModel, toQty);
+		}
+		else if (mode == INV_RIGHT_PLAYER)
+		{
+			CallLocalFunction("Inv_OnLootTransfer", "ddisii", playerid, g_InvRightId[playerid], false, toName, toModel, toQty);
+			Inventory_NotifyRemoved(playerid, toName, toModel, toQty);
+		}
+		else
+		{
+			CallLocalFunction("Inv_OnRightStorageChanged", "dd", playerid, g_InvRightId[playerid]);
+			Inventory_NotifyRemoved(playerid, toName, toModel, toQty);
+		}
 	}
 	else if (fromPanel == INV_PANEL_RIGHT && toPanel == INV_PANEL_LEFT)
 	{
-		CallLocalFunction("Inv_OnItemPickup", "ddsii", playerid, pileid, toName, toModel, toQty);
-		Inventory_NotifyReceived(playerid, toName, toModel, toQty);
+		if (mode == INV_RIGHT_DROPS)
+		{
+			CallLocalFunction("Inv_OnItemPickup", "ddsii", playerid, pileid, toName, toModel, toQty);
+			Inventory_NotifyReceived(playerid, toName, toModel, toQty);
+		}
+		else if (mode == INV_RIGHT_PLAYER)
+		{
+			CallLocalFunction("Inv_OnLootTransfer", "ddisii", playerid, g_InvRightId[playerid], true, toName, toModel, toQty);
+			Inventory_NotifyReceived(playerid, toName, toModel, toQty);
+		}
+		else
+		{
+			CallLocalFunction("Inv_OnRightStorageChanged", "dd", playerid, g_InvRightId[playerid]);
+			Inventory_NotifyReceived(playerid, toName, toModel, toQty);
+		}
+	}
+	else if (mode == INV_RIGHT_STORAGE && (fromPanel == INV_PANEL_RIGHT || toPanel == INV_PANEL_RIGHT))
+	{
+		CallLocalFunction("Inv_OnRightStorageChanged", "dd", playerid, g_InvRightId[playerid]);
+	}
+	else if (mode == INV_RIGHT_PLAYER && (fromPanel == INV_PANEL_RIGHT || toPanel == INV_PANEL_RIGHT))
+	{
+		CallLocalFunction("Inv_OnInventoryChanged", "d", g_InvRightId[playerid]);
 	}
 
-	if (pileid != -1 && DropPiles[pileid][dropExists])
+	if (mode == INV_RIGHT_DROPS && pileid != -1 && DropPiles[pileid][dropExists])
 	{
 		if (DropPile_CountItems(pileid) <= 0)
 		{
@@ -1110,11 +1590,13 @@ stock Inv_RefreshRightSlot(playerid, ui)
 	if (!g_InvOpen[playerid] || ui < 0 || ui >= INV_UI_SLOTS)
 		return 0;
 
-	new pileid = g_InvNearPile[playerid];
 	new string[16];
 	new bool:selected = (g_InvSelected2[playerid] == ui);
-	new bool:hasItem = (pileid != -1 && DropPiles[pileid][dropExists]
-		&& DropPileSlots[pileid][ui][invExists] && DropPileSlots[pileid][ui][invQuantity] > 0);
+	new bool:exists, model, qty, itemName[MAX_INVENTORY_ITEM_NAME];
+	new bool:hasItem = false;
+
+	if (Inv_RightReadSlot(playerid, ui, exists, model, qty, itemName, sizeof(itemName)) && exists && qty > 0)
+		hasItem = true;
 
 	if (!hasItem)
 	{
@@ -1129,13 +1611,13 @@ stock Inv_RefreshRightSlot(playerid, ui)
 	}
 	else
 	{
-		PlayerTextDrawSetPreviewModel(playerid, g_Inv2Preview[playerid][ui], DropPileSlots[pileid][ui][invModel]);
+		PlayerTextDrawSetPreviewModel(playerid, g_Inv2Preview[playerid][ui], model);
 		PlayerTextDrawBackgroundColour(playerid, g_Inv2Preview[playerid][ui], selected ? (-1523963217) : (30));
-		PlayerTextDrawSetString(playerid, g_Inv2Name[playerid][ui], DropPileSlots[pileid][ui][invItem]);
-		if (Inv_IsGunItem(DropPileSlots[pileid][ui][invItem]))
-			format(string, sizeof(string), "A:%i", DropPileSlots[pileid][ui][invQuantity]);
+		PlayerTextDrawSetString(playerid, g_Inv2Name[playerid][ui], itemName);
+		if (Inv_IsGunItem(itemName))
+			format(string, sizeof(string), "A:%i", qty);
 		else
-			format(string, sizeof(string), "%i", DropPileSlots[pileid][ui][invQuantity]);
+			format(string, sizeof(string), "%i", qty);
 		PlayerTextDrawSetString(playerid, g_Inv2Qty[playerid][ui], string);
 		PlayerTextDrawUseBox(playerid, g_Inv2Accent[playerid][ui], true);
 		PlayerTextDrawShow(playerid, g_Inv2Name[playerid][ui]);
@@ -1153,13 +1635,28 @@ stock Inv_RefreshRightPanel(playerid)
 	if (!g_InvOpen[playerid])
 		return 0;
 
-	Inv_GatherNearbyDrops(playerid);
+	Inv_RightEnsureReady(playerid);
 	g_InvSelected2[playerid] = -1;
 
-	if (g_InvNearPile[playerid] == -1)
-		PlayerTextDrawSetString(playerid, g_Inv2Title[playerid], "Nearby Drops");
+	if (g_InvRightTitle[playerid][0])
+		PlayerTextDrawSetString(playerid, g_Inv2Title[playerid], g_InvRightTitle[playerid]);
 	else
-		PlayerTextDrawSetString(playerid, g_Inv2Title[playerid], "Nearest Bag");
+	{
+		switch (g_InvRightMode[playerid])
+		{
+			case INV_RIGHT_PLAYER:
+				PlayerTextDrawSetString(playerid, g_Inv2Title[playerid], "Player Loot");
+			case INV_RIGHT_STORAGE:
+				PlayerTextDrawSetString(playerid, g_Inv2Title[playerid], "Storage");
+			default:
+			{
+				if (g_InvNearPile[playerid] == -1)
+					PlayerTextDrawSetString(playerid, g_Inv2Title[playerid], "Nearby Drops");
+				else
+					PlayerTextDrawSetString(playerid, g_Inv2Title[playerid], "Nearest Bag");
+			}
+		}
+	}
 
 	for (new ui = 0; ui < INV_UI_SLOTS; ui++)
 	{
@@ -1445,7 +1942,7 @@ stock Inventory_Show(playerid)
 	if (!IsPlayerConnected(playerid))
 		return 0;
 	if (g_InvOpen[playerid])
-		Inventory_Hide(playerid);
+		Inventory_Hide(playerid, false);
 
 	g_InvSelected[playerid] = -1;
 	g_InvSelected2[playerid] = -1;
@@ -1476,10 +1973,13 @@ stock Inventory_Show(playerid)
 	return 1;
 }
 
-stock Inventory_Hide(playerid)
+stock Inventory_Hide(playerid, bool:resetContext = true)
 {
 	if (!g_InvOpen[playerid])
 		return 0;
+
+	new mode = g_InvRightMode[playerid];
+	new sid = g_InvRightId[playerid];
 
 	g_InvOpen[playerid] = false;
 	g_InvSelected[playerid] = -1;
@@ -1489,6 +1989,15 @@ stock Inventory_Hide(playerid)
 	Inv_DestroyUI(playerid);
 	g_InvIgnoreEsc[playerid] = true;
 	CancelSelectTextDraw(playerid);
+
+	if (resetContext)
+	{
+		if (mode == INV_RIGHT_STORAGE)
+			CallLocalFunction("Inv_OnRightStorageChanged", "dd", playerid, sid);
+		g_InvRightMode[playerid] = INV_RIGHT_DROPS;
+		g_InvRightId[playerid] = -1;
+		g_InvRightTitle[playerid][0] = EOS;
+	}
 	return 1;
 }
 
@@ -1535,14 +2044,14 @@ stock Inv_ClickPlayerTD(playerid, PlayerText:playertextid)
 		return 1;
 	}
 
-	// Right slots - select bag item or drop/move onto that bag slot
+	// Right slots - select or move onto right context slot
 	for (new ui = 0; ui < INV_UI_SLOTS; ui++)
 	{
 		if (playertextid != g_Inv2Preview[playerid][ui])
 			continue;
 
-		new pileid = g_InvNearPile[playerid];
-		new bool:hasItem = (pileid != -1 && DropPiles[pileid][dropExists] && DropPileSlots[pileid][ui][invExists]);
+		Inv_RightEnsureReady(playerid);
+		new bool:hasItem = Inv_RightSlotExists(playerid, ui);
 
 		if (g_InvDragPanel[playerid] == INV_PANEL_NONE)
 		{
@@ -1559,7 +2068,6 @@ stock Inv_ClickPlayerTD(playerid, PlayerText:playertextid)
 			return 1;
 		}
 
-		// Left -> right empty/occupied, or right -> right rearrange
 		if (!Inv_MoveBetweenSlots(playerid, g_InvDragPanel[playerid], g_InvDragSlot[playerid], INV_PANEL_RIGHT, ui))
 			SendClientMessage(playerid, 0xFFFF00AA, "Could not move that item.");
 		return 1;
@@ -1595,6 +2103,18 @@ stock Inv_ClickPlayerTD(playerid, PlayerText:playertextid)
 		new slot = g_InvSelected[playerid];
 		if (slot < 0 || !InventoryData[playerid][slot][invExists])
 			return SendClientMessage(playerid, 0xAAAAAAFF, "Select an inventory item first."), 1;
+
+		// In loot/storage mode, Drop moves into the right panel
+		if (g_InvRightMode[playerid] != INV_RIGHT_DROPS)
+		{
+			Inv_RightEnsureReady(playerid);
+			new dest = Inv_RightFindFree(playerid);
+			if (dest == -1)
+				return SendClientMessage(playerid, 0xFFFF00AA, "Right panel is full."), 1;
+			if (!Inv_MoveBetweenSlots(playerid, INV_PANEL_LEFT, slot, INV_PANEL_RIGHT, dest))
+				SendClientMessage(playerid, 0xFFFF00AA, "Could not move that item.");
+			return 1;
+		}
 
 		new qty = InventoryData[playerid][slot][invQuantity];
 		// Guns always drop as one whole weapon (ammo stays with it)

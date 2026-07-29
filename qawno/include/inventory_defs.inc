@@ -53,7 +53,36 @@
 	#define INV_NOTIFY_ENABLE       (1)
 #endif
 #if !defined INV_NOTIFY_DURATION
-	#define INV_NOTIFY_DURATION     (5000)
+	#define INV_NOTIFY_DURATION     (2000)
+#endif
+#if !defined INV_NOTIFY_MAX
+	#define INV_NOTIFY_MAX          (3)
+#endif
+#if !defined INV_NOTIFY_SPACING
+	#define INV_NOTIFY_SPACING      (38.0)
+#endif
+#if !defined INV_NOTIFY_CENTER_X
+	#define INV_NOTIFY_CENTER_X     (320.0)
+#endif
+#if !defined INV_NOTIFY_Y
+	#define INV_NOTIFY_Y            (350.0)
+#endif
+
+// Right panel context modes (dynamic: drops / loot / house / etc.)
+#if !defined INV_RIGHT_DROPS
+	#define INV_RIGHT_DROPS         (0)
+#endif
+#if !defined INV_RIGHT_PLAYER
+	#define INV_RIGHT_PLAYER        (1)
+#endif
+#if !defined INV_RIGHT_STORAGE
+	#define INV_RIGHT_STORAGE       (2)
+#endif
+#if !defined MAX_INV_RIGHT_TITLE
+	#define MAX_INV_RIGHT_TITLE     (32)
+#endif
+#if !defined INV_LOOT_RANGE
+	#define INV_LOOT_RANGE          (5.0)
 #endif
 
 forward Inventory_Add(playerid, const item[], model, quantity = 1, bool:notify = true);
@@ -63,6 +92,7 @@ forward Inventory_ShowNotification(playerid, const title[], const item[], model,
 forward Inventory_NotifyReceived(playerid, const item[], model, quantity = 1);
 forward Inventory_NotifyRemoved(playerid, const item[], model, quantity = 1);
 forward Inv_HideItemNotification(playerid);
+forward Inv_NotifOnExpire(playerid);
 forward Inventory_Count(playerid, const item[]);
 forward Inventory_HasItem(playerid, const item[]);
 forward Inventory_GetFreeID(playerid);
@@ -72,13 +102,23 @@ forward Inventory_Clear(playerid);
 forward Inventory_OnPlayerConnect(playerid);
 forward Inventory_OnPlayerDisconnect(playerid);
 forward Inventory_Show(playerid);
-forward Inventory_Hide(playerid);
+forward Inventory_Hide(playerid, bool:resetContext = true);
 forward Inventory_IsOpen(playerid);
 forward Inventory_GetSlot(playerid, slot, item[], itemLen, &model, &quantity);
 forward Inventory_SetSlot(playerid, slot, const item[], model, quantity);
 forward Inv_ClickPlayerTD(playerid, PlayerText:playertextid);
 forward Inv_HandleEscClose(playerid);
 forward Inventory_OnDialogResponse(playerid, dialogid, response, listitem, const inputtext[]);
+
+forward Inventory_SetRightContext(playerid, mode, id = -1, const title[] = "");
+forward Inventory_ClearRightContext(playerid);
+forward Inventory_GetRightContext(playerid, &mode, &id);
+forward Inventory_Right_Clear(playerid);
+forward Inventory_Right_SetSlot(playerid, slot, const item[], model, quantity);
+forward Inventory_Right_GetSlot(playerid, slot, item[], itemLen, &model, &quantity);
+forward Inventory_OpenLoot(playerid, targetid);
+forward Inventory_OpenStorage(playerid, storageid, const title[] = "Storage");
+forward Inventory_FindLootTarget(playerid, Float:range = INV_LOOT_RANGE);
 
 forward DropItem(const item[], model, quantity, Float:x, Float:y, Float:z, interior = 0, world = 0);
 forward DropItemInFront(playerid, const item[], model, quantity = 1);
@@ -96,3 +136,5 @@ forward Inv_OnItemUse(playerid, slot, const item[], model, quantity);
 forward Inv_OnItemDrop(playerid, slot, const item[], model, quantity);
 forward Inv_OnItemPickup(playerid, pileid, const item[], model, quantity);
 forward Inv_OnInventoryChanged(playerid);
+forward Inv_OnRightStorageChanged(playerid, storageid);
+forward Inv_OnLootTransfer(playerid, targetid, bool:taking, const item[], model, quantity);

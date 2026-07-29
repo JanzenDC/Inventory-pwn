@@ -44,15 +44,17 @@ No MySQL plugin needed.
 | Command / action | Result |
 |------------------|--------|
 | `/giveitem` | Add Bread + Medkit |
-| `/givegun` | Give Deagle in hand (for `/placegun`) |
-| `/placegun` | Store held gun + ammo into inventory |
-| `/dropfront` | Spawn Medkit bag in front of you |
-| `/inv` | Open inventory UI |
+| `/givegun` | Give Deagle in hand |
+| `/placegun` | Store held gun in inventory |
+| `/dropfront` | Drop Medkit on ground |
+| `/inv` | Open inventory (right = nearby drops) |
+| `/loot` `[id]` | Loot nearest/other player (right = their inv) |
+| `/houseinv` | Demo house storage on the right panel |
 | Click left slot | Select item (click again to cancel) |
-| Click right slot | Select bag item, or place selected item there |
+| Click right slot | Select / place into right context |
 | Click 2nd slot | Move / swap / stack onto that target |
 | **Use** | Use item, or equip gun |
-| **Drop** | Drop into ground bag (right panel) |
+| **Drop** | Ground bag, or deposit into loot/storage |
 | **Close** / ESC | Close UI |
 
 ---
@@ -325,7 +327,40 @@ Define **before** `#include <inventory>`:
 | `INV_DROP_MERGE_RANGE` | `2.0` | Merge drops into same bag |
 | `INV_DROP_FORWARD` | `1.5` | Drop distance in front of player |
 | `INV_NOTIFY_ENABLE` | `1` | Show Received/Removed toast on add/remove |
-| `INV_NOTIFY_DURATION` | `5000` | Toast lifetime (ms) |
+| `INV_NOTIFY_DURATION` | `2000` | Toast lifetime (ms) |
+| `INV_NOTIFY_MAX` | `3` | Max toasts shown side-by-side (oldest shifts off) |
+| `INV_LOOT_RANGE` | `5.0` | Default range for `Inventory_FindLootTarget` |
+
+---
+
+## Right panel contexts
+
+The right panel is dynamic:
+
+| Mode | Constant | Right side shows |
+|------|----------|------------------|
+| Drops | `INV_RIGHT_DROPS` | Nearest ground bag (default `/inv`) |
+| Player | `INV_RIGHT_PLAYER` | Another player's inventory (`/loot`) |
+| Storage | `INV_RIGHT_STORAGE` | External buffer (house, vehicle, …) |
+
+```pawn
+// Loot nearest / specific player
+Inventory_OpenLoot(playerid, targetid);
+
+// House / trunk / fridge — load buffer then open
+Inventory_Right_Clear(playerid);
+Inventory_Right_SetSlot(playerid, 0, "Bread", 2670, 5);
+Inventory_OpenStorage(playerid, houseid, "House Storage");
+
+// Or set mode without opening
+Inventory_SetRightContext(playerid, INV_RIGHT_STORAGE, houseid, "House Storage");
+Inventory_Show(playerid);
+
+// Back to nearby drops
+Inventory_ClearRightContext(playerid);
+```
+
+On move/close in storage mode, `Inv_OnRightStorageChanged` fires — copy slots out with `Inventory_Right_GetSlot` and save to DB.
 
 ---
 
@@ -339,6 +374,9 @@ Define **before** `#include <inventory>`:
 | `Inventory_Count` / `HasItem` / `GetItemID` / `GetFreeID` | Queries |
 | `Inventory_Clear` / `Items` | Wipe / used-slot count |
 | `Inventory_Show` / `Hide` / `IsOpen` | Textdraw UI |
+| `Inventory_SetRightContext` / `ClearRightContext` / `GetRightContext` | Right panel mode |
+| `Inventory_Right_Clear` / `SetSlot` / `GetSlot` | External storage buffer |
+| `Inventory_OpenLoot` / `OpenStorage` / `FindLootTarget` | Convenience openers |
 | `Inventory_PlaceGun` / `EquipGun` | Hand weapon <-> inventory |
 | `DropItem` / `DropItemInFront` | Ground bag |
 | `Item_Nearest` / `Inventory_PickupDropped` | Find / take from bag |
@@ -352,6 +390,8 @@ Define **before** `#include <inventory>`:
 | `Inv_OnItemUse` | Use on non-gun item |
 | `Inv_OnItemDrop` | Dropped to ground bag |
 | `Inv_OnItemPickup` | Taken from ground bag |
+| `Inv_OnLootTransfer` | Moved to/from another player's inventory |
+| `Inv_OnRightStorageChanged` | House/storage buffer changed (or UI closed) |
 | `Inv_OnInventoryChanged` | Optional (unused offline unless you hook it) |
 
 ---
