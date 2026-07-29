@@ -1,6 +1,8 @@
 /*
  * inventory_defs.inc - Early inventory API (defines + forwards)
  *
+ * Credits: Habibi / Janzzzz
+ *
  * Include this BEFORE other modules that call Inventory_* so they can see
  * the API without pulling the full textdraw implementation:
  *

@@ -1,8 +1,10 @@
 /*
  * inventory.inc - Reusable textdraw inventory for open.mp / SA-MP
  *
+ * Credits: Habibi / Janzzzz
+ *
  * Left panel  = player inventory (5x4 model previews)
- * Right panel = nearby dropped / ground items
+ * Right panel = nearest dropped bag contents
  * Actions     = Use / Drop / Close (Drop places the item in front of the player)
  *
  *   #include <open.mp>
