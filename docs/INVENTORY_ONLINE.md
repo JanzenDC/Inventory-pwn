@@ -2,7 +2,7 @@
 
 Credits: **Habibi / Janzzzz**
 
-Back to: [Readme.md](../Readme.md) | [Docs hub](INVENTORY.md) | [Offline docs](INVENTORY_OFFLINE.md)
+Back to: [Readme.md](../Readme.md) | [Docs hub](INVENTORY.md) | [Easy examples](INVENTORY_EXAMPLES.md) | [Offline docs](INVENTORY_OFFLINE.md)
 
 **Mode:** MySQL persistence via `a_mysql.inc`.  
 **Demo:** `gamemodes/inventory_test_online.pwn`  
@@ -11,7 +11,8 @@ Back to: [Readme.md](../Readme.md) | [Docs hub](INVENTORY.md) | [Offline docs](I
 
 UI, guns, click-to-move, and ground bags work the same as offline. This page covers **database setup, save, and delete**.
 
-For UI / API / item tables, see [INVENTORY_OFFLINE.md](INVENTORY_OFFLINE.md).
+For UI / API / item tables, see [INVENTORY_OFFLINE.md](INVENTORY_OFFLINE.md).  
+For loot / house right-panel examples, see [INVENTORY_EXAMPLES.md](INVENTORY_EXAMPLES.md).
 
 ---
 

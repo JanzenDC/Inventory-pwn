@@ -2,11 +2,13 @@
 
 Credits: **Habibi / Janzzzz**
 
-Back to: [Readme.md](../Readme.md) | [Docs hub](INVENTORY.md) | [Online docs](INVENTORY_ONLINE.md)
+Back to: [Readme.md](../Readme.md) | [Docs hub](INVENTORY.md) | [Easy examples](INVENTORY_EXAMPLES.md) | [Online docs](INVENTORY_ONLINE.md)
 
 **Mode:** no database. Inventory lives in memory only.  
 **Demo:** `gamemodes/inventory_test.pwn`  
 **Compile:** `compile_inventory.bat`
+
+> New to the right panel (drops / loot / house)? Start with **[INVENTORY_EXAMPLES.md](INVENTORY_EXAMPLES.md)**.
 
 ---
 
@@ -15,6 +17,7 @@ Back to: [Readme.md](../Readme.md) | [Docs hub](INVENTORY.md) | [Online docs](IN
 - [Quick start](#quick-start)
 - [In-game commands](#in-game-commands)
 - [Using in your gamemode](#using-in-your-gamemode)
+- [Right panel contexts](#right-panel-contexts) → full walkthrough in [EXAMPLES](INVENTORY_EXAMPLES.md)
 - [Configuration](#configuration)
 - [API](#api)
 - [Screenshots](#screenshots)
@@ -335,7 +338,10 @@ Define **before** `#include <inventory>`:
 
 ## Right panel contexts
 
-The right panel is dynamic:
+Full beginner examples (drops / loot / house / trunk):  
+**[INVENTORY_EXAMPLES.md](INVENTORY_EXAMPLES.md)**
+
+Short reference:
 
 | Mode | Constant | Right side shows |
 |------|----------|------------------|
@@ -344,23 +350,16 @@ The right panel is dynamic:
 | Storage | `INV_RIGHT_STORAGE` | External buffer (house, vehicle, …) |
 
 ```pawn
-// Loot nearest / specific player
 Inventory_OpenLoot(playerid, targetid);
 
-// House / trunk / fridge — load buffer then open
 Inventory_Right_Clear(playerid);
 Inventory_Right_SetSlot(playerid, 0, "Bread", 2670, 5);
 Inventory_OpenStorage(playerid, houseid, "House Storage");
 
-// Or set mode without opening
-Inventory_SetRightContext(playerid, INV_RIGHT_STORAGE, houseid, "House Storage");
-Inventory_Show(playerid);
-
-// Back to nearby drops
-Inventory_ClearRightContext(playerid);
+Inventory_ClearRightContext(playerid); // back to drops
 ```
 
-On move/close in storage mode, `Inv_OnRightStorageChanged` fires — copy slots out with `Inventory_Right_GetSlot` and save to DB.
+On move/close in storage mode, `Inv_OnRightStorageChanged` fires — copy slots with `Inventory_Right_GetSlot` and save.
 
 ---
 
