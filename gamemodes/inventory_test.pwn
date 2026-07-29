@@ -13,12 +13,45 @@
 #include <open.mp>
 #include <inventory>
 
-#define ITEM_BREAD_NAME    "Bread"
-#define ITEM_BREAD_MODEL   (2670)
-#define ITEM_PISTOL_NAME   "Pistol"
-#define ITEM_PISTOL_MODEL  (346)
-#define ITEM_MEDKIT_NAME   "Medkit"
-#define ITEM_MEDKIT_MODEL  (11738)
+// One row per item - add new items here only.
+enum
+{
+    ITEM_BREAD,
+    ITEM_PISTOL,
+    ITEM_MEDKIT
+}
+
+enum E_ITEM_INFO
+{
+    itemName[24],
+    itemModel
+}
+
+new const g_Items[][E_ITEM_INFO] =
+{
+    { "Bread",  2670  }, // ITEM_BREAD
+    { "Pistol", 346   }, // ITEM_PISTOL
+    { "Medkit", 11738 }  // ITEM_MEDKIT
+};
+
+stock bool:IsItem(const item[], itemid)
+{
+    return bool:(itemid >= 0 && itemid < sizeof(g_Items) && !strcmp(item, g_Items[itemid][itemName], true));
+}
+
+stock GiveItem(playerid, itemid, quantity = 1)
+{
+    if (itemid < 0 || itemid >= sizeof(g_Items))
+        return 0;
+    return Inventory_Add(playerid, g_Items[itemid][itemName], g_Items[itemid][itemModel], quantity);
+}
+
+stock DropFront(playerid, itemid, quantity = 1)
+{
+    if (itemid < 0 || itemid >= sizeof(g_Items))
+        return -1;
+    return DropItemInFront(playerid, g_Items[itemid][itemName], g_Items[itemid][itemModel], quantity);
+}
 
 main()
 {
@@ -56,8 +89,7 @@ public OnPlayerDisconnect(playerid, reason)
 
 public OnPlayerSpawn(playerid)
 {
-    // Place a test drop in front of the player for the right panel
-    DropItemInFront(playerid, ITEM_MEDKIT_NAME, ITEM_MEDKIT_MODEL, 1);
+    DropFront(playerid, ITEM_MEDKIT, 1);
     SendClientMessage(playerid, 0x33CCFFFF, "A Medkit was dropped in front of you - open /inv and check the right panel.");
     return 1;
 }
@@ -66,16 +98,15 @@ public OnPlayerCommandText(playerid, cmdtext[])
 {
     if (!strcmp(cmdtext, "/giveitem", true))
     {
-        Inventory_Add(playerid, ITEM_BREAD_NAME, ITEM_BREAD_MODEL, 3);
-        Inventory_Add(playerid, ITEM_PISTOL_NAME, ITEM_PISTOL_MODEL, 1);
+        GiveItem(playerid, ITEM_BREAD, 3);
+        GiveItem(playerid, ITEM_PISTOL, 1);
         SendClientMessage(playerid, 0xFFFFFFFF, "Gave you 3x Bread and 1x Pistol.");
         return 1;
     }
 
     if (!strcmp(cmdtext, "/dropfront", true))
     {
-        new id = DropItemInFront(playerid, ITEM_MEDKIT_NAME, ITEM_MEDKIT_MODEL, 2);
-        if (id == -1)
+        if (DropFront(playerid, ITEM_MEDKIT, 2) == -1)
             SendClientMessage(playerid, 0xFFFF00AA, "Could not create a dropped item (pool full?).");
         else
             SendClientMessage(playerid, 0x33CCFFFF, "Dropped 2x Medkit in front of you. Open /inv to see it on the right.");
@@ -115,13 +146,13 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 public Inv_OnItemUse(playerid, slot, const item[], model, quantity)
 {
     #pragma unused model, quantity
-    if (!strcmp(item, ITEM_BREAD_NAME, true))
+    if (IsItem(item, ITEM_BREAD))
     {
         Inventory_RemoveEx(playerid, slot, 1);
         SendClientMessage(playerid, 0xFFFFFFFF, "You ate some bread.");
         return 1;
     }
-    if (!strcmp(item, ITEM_MEDKIT_NAME, true))
+    if (IsItem(item, ITEM_MEDKIT))
     {
         Inventory_RemoveEx(playerid, slot, 1);
         SetPlayerHealth(playerid, 100.0);
@@ -152,3 +183,4 @@ public Inv_OnItemPickup(playerid, pileid, const item[], model, quantity)
     SendClientMessage(playerid, 0xFFFFFFFF, msg);
     return 1;
 }
+
