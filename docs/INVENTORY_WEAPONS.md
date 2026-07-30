@@ -202,6 +202,77 @@ Safer for DB load: `Inventory_SetSlot` with the same fields (silent, no toast).
 
 ---
 
+## Online (MySQL) — weapon database
+
+Guns use the **same table** as Bread/Medkit. No separate weapons table is required.
+
+### What gets saved
+
+| Column | Gun example | Meaning |
+|--------|-------------|---------|
+| `invItem` | `Gun: Desert Eagle` | Must start with `Gun: ` |
+| `invModel` | `348` | Weapon object model |
+| `invQuantity` | `50` | **Ammo** (not stack count) |
+| `slot` | `0`–`19` | Inventory slot |
+
+Example row after `/placegun`:
+
+```text
+owner_name | slot | invItem            | invModel | invQuantity
+Player1    | 3    | Gun: Desert Eagle  | 348      | 50
+```
+
+### Flow
+
+```
+/givegun → hold gun → /placegun
+       → Inventory_Add("Gun: ...", model, ammo)
+       → Inv_OnInventoryChanged → MySQL save (after ~1.2s)
+
+Reconnect → SELECT rows → Inventory_SetSlot(...)
+         → /inv shows the gun again with A:50
+         → Use → Inventory_EquipGun → ammo restored to hand
+```
+
+### Load / save (same as any item)
+
+```pawn
+// LOAD (from MySQL row)
+Inventory_SetSlot(playerid, slot, "Gun: Desert Eagle", 348, 50);
+// silent — no toast; quantity = ammo
+
+// SAVE (read slot for INSERT)
+new item[64], model, qty;
+if (Inventory_GetSlot(playerid, slot, item, sizeof(item), model, qty))
+{
+    // qty is ammo when item starts with "Gun: "
+    // INSERT owner, slot, item, model, qty
+}
+```
+
+The demo `inventory_test_online.pwn` already does this for **all** slots — guns included. You do not need special `InvDB_SaveGun` code.
+
+### Rules for online guns
+
+1. Always store the name with the `Gun: ` prefix (what `Inventory_PlaceGun` writes).  
+2. Keep `invModel` as the real weapon preview model.  
+3. Treat `invQuantity` as ammo when loading/equipping.  
+4. Prefer `Inventory_PlaceGun` / `Inventory_EquipGun` in gameplay; use `SetSlot` only for DB load.  
+5. After equip, the slot is cleared → next save **deletes** that row (wipe-and-rewrite in the demo).
+
+### Optional: separate weapons table?
+
+Only if you want RP features beyond the panel (serials, durability, attachments). Then:
+
+- Keep panel guns as today (`Gun: ...` in `player_inventory`), **or**  
+- On place/equip, also write `player_weapons` with extra columns  
+
+The include does not require a second table. Start with the single `player_inventory` table.
+
+Full MySQL setup: [INVENTORY_ONLINE.md](INVENTORY_ONLINE.md)
+
+---
+
 ## Related
 
 | Doc | Content |
@@ -209,4 +280,4 @@ Safer for DB load: `Inventory_SetSlot` with the same fields (silent, no toast).
 | [INVENTORY_ADD_ITEMS.md](INVENTORY_ADD_ITEMS.md) | Normal items (Bread, Water, …) |
 | [INVENTORY_EXAMPLES.md](INVENTORY_EXAMPLES.md) | Right panels |
 | [INVENTORY_OFFLINE.md](INVENTORY_OFFLINE.md) | Full API |
-| [INVENTORY_ONLINE.md](INVENTORY_ONLINE.md) | MySQL — gun ammo saved as `invQuantity` |
+| [INVENTORY_ONLINE.md](INVENTORY_ONLINE.md) | MySQL save / delete |

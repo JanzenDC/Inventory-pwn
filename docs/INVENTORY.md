@@ -9,7 +9,7 @@ The inventory library is the same include for both modes. Choose the guide that 
 | Guide | When to use |
 |-------|-------------|
 | **[INVENTORY_ADD_ITEMS.md](INVENTORY_ADD_ITEMS.md)** | **Starter** — add an item step by step so it shows on the panel |
-| **[INVENTORY_WEAPONS.md](INVENTORY_WEAPONS.md)** | **Starter** — place / equip guns on the panel |
+| **[INVENTORY_WEAPONS.md](INVENTORY_WEAPONS.md)** | **Starter** — place / equip guns (offline + MySQL) |
 | [INVENTORY_EXAMPLES.md](INVENTORY_EXAMPLES.md) | Easy copy/paste for drops, loot, house, trunk |
 | [INVENTORY_OFFLINE.md](INVENTORY_OFFLINE.md) | Full offline API, guns, config |
 | [INVENTORY_ONLINE.md](INVENTORY_ONLINE.md) | MySQL save / delete |

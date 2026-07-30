@@ -2,7 +2,7 @@
 
 Credits: **Habibi / Janzzzz**
 
-Back to: [Readme.md](../Readme.md) | [Docs hub](INVENTORY.md) | [Easy examples](INVENTORY_EXAMPLES.md) | [Offline docs](INVENTORY_OFFLINE.md)
+Back to: [Readme.md](../Readme.md) | [Docs hub](INVENTORY.md) | [Easy examples](INVENTORY_EXAMPLES.md) | [Weapons](INVENTORY_WEAPONS.md) | [Offline docs](INVENTORY_OFFLINE.md)
 
 **Mode:** MySQL persistence via `a_mysql.inc`.  
 **Demo:** `gamemodes/inventory_test_online.pwn`  
@@ -13,7 +13,7 @@ UI, guns, click-to-move, and ground bags work the same as offline. This page cov
 
 For UI / API / item tables, see [INVENTORY_OFFLINE.md](INVENTORY_OFFLINE.md).  
 To add items so they show on the panel, see [INVENTORY_ADD_ITEMS.md](INVENTORY_ADD_ITEMS.md).  
-For weapons (`/placegun`, ammo as quantity), see [INVENTORY_WEAPONS.md](INVENTORY_WEAPONS.md).  
+For weapons online/offline, see [INVENTORY_WEAPONS.md](INVENTORY_WEAPONS.md#online-mysql--weapon-database).  
 For loot / house right-panel examples, see [INVENTORY_EXAMPLES.md](INVENTORY_EXAMPLES.md).
 
 ---
@@ -24,6 +24,7 @@ For loot / house right-panel examples, see [INVENTORY_EXAMPLES.md](INVENTORY_EXA
 - [In-game commands](#in-game-commands)
 - [Save flow](#save-flow)
 - [How delete works in the database](#how-delete-works-in-the-database)
+- [Weapons in MySQL](#weapons-in-mysql)
 - [Wire MySQL in your gamemode](#wire-mysql-in-your-gamemode)
 - [Table shape](#table-shape)
 - [Differences from offline](#differences-from-offline)
@@ -123,6 +124,26 @@ Important:
 - Only **left inventory** slots are stored.
 - Key column is `owner_name` (player name). Renaming = different rows.
 - Gun ammo is stored in `invQuantity`.
+
+---
+
+## Weapons in MySQL
+
+Guns are **normal inventory rows**. No extra weapons table needed.
+
+| Field | Stores |
+|-------|--------|
+| `invItem` | `Gun: Desert Eagle` (prefix required) |
+| `invModel` | Weapon object model |
+| `invQuantity` | **Ammo** |
+
+```
+/placegun → save row with ammo
+reconnect → SetSlot → gun on panel
+Use → EquipGun → ammo back in hand → row removed on next save
+```
+
+Step-by-step + advanced notes: [INVENTORY_WEAPONS.md — Online](INVENTORY_WEAPONS.md#online-mysql--weapon-database)
 
 ---
 
