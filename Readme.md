@@ -14,7 +14,8 @@ LEFT = your bag          RIGHT = drops / loot / house / trunk
 
 | I want… | Open this |
 |---------|-----------|
-| **Add an item** so it shows on the panel | **[docs/INVENTORY_ADD_ITEMS.md](docs/INVENTORY_ADD_ITEMS.md)** |
+| **Add an item** so it shows on the panel | [docs/INVENTORY_ADD_ITEMS.md](docs/INVENTORY_ADD_ITEMS.md) |
+| **Add / store weapons** on the panel | **[docs/INVENTORY_WEAPONS.md](docs/INVENTORY_WEAPONS.md)** |
 | Easy examples (drops, loot, house) | [docs/INVENTORY_EXAMPLES.md](docs/INVENTORY_EXAMPLES.md) |
 | Offline full guide (API, guns, config) | [docs/INVENTORY_OFFLINE.md](docs/INVENTORY_OFFLINE.md) |
 | Online MySQL save | [docs/INVENTORY_ONLINE.md](docs/INVENTORY_ONLINE.md) |
@@ -47,6 +48,7 @@ compile_inventory.bat
 | [gamemodes/inventory_test.pwn](gamemodes/inventory_test.pwn) | Offline demo |
 | [gamemodes/inventory_test_online.pwn](gamemodes/inventory_test_online.pwn) | MySQL demo |
 | [docs/INVENTORY_ADD_ITEMS.md](docs/INVENTORY_ADD_ITEMS.md) | Starter: add items |
+| [docs/INVENTORY_WEAPONS.md](docs/INVENTORY_WEAPONS.md) | Starter: weapons |
 | [docs/INVENTORY_EXAMPLES.md](docs/INVENTORY_EXAMPLES.md) | Easy examples |
 | [docs/INVENTORY_OFFLINE.md](docs/INVENTORY_OFFLINE.md) | Offline docs |
 | [docs/INVENTORY_ONLINE.md](docs/INVENTORY_ONLINE.md) | Online docs |

@@ -13,6 +13,7 @@ UI, guns, click-to-move, and ground bags work the same as offline. This page cov
 
 For UI / API / item tables, see [INVENTORY_OFFLINE.md](INVENTORY_OFFLINE.md).  
 To add items so they show on the panel, see [INVENTORY_ADD_ITEMS.md](INVENTORY_ADD_ITEMS.md).  
+For weapons (`/placegun`, ammo as quantity), see [INVENTORY_WEAPONS.md](INVENTORY_WEAPONS.md).  
 For loot / house right-panel examples, see [INVENTORY_EXAMPLES.md](INVENTORY_EXAMPLES.md).
 
 ---

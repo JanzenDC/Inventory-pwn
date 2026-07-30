@@ -234,7 +234,11 @@ Find more object models in any SA object browser (e.g. objects.gta3 / open.mp do
 
 ## Guns (special case)
 
-Guns are not normal table rows. Player must **hold** the weapon, then:
+Guns are different from Bread/Water. Full walkthrough:
+
+**[INVENTORY_WEAPONS.md](INVENTORY_WEAPONS.md)**
+
+Short version — hold weapon, then:
 
 ```pawn
 Inventory_PlaceGun(playerid); // hand → left panel as "Gun: Deagle" + ammo
@@ -270,6 +274,8 @@ You still add items the same way — only persistence is different. See [INVENTO
 
 | Doc | Why |
 |-----|-----|
-| [INVENTORY_EXAMPLES.md](INVENTORY_EXAMPLES.md) | Drops / loot / house right panels |
-| [INVENTORY_OFFLINE.md](INVENTORY_OFFLINE.md) | Full API + config |
-| [INVENTORY_ONLINE.md](INVENTORY_ONLINE.md) | Save inventory to MySQL |
+| [INVENTORY_ADD_ITEMS.md](INVENTORY_ADD_ITEMS.md) | Normal items (Bread, Water, …) |
+| [INVENTORY_WEAPONS.md](INVENTORY_WEAPONS.md) | Place / equip guns |
+| [INVENTORY_EXAMPLES.md](INVENTORY_EXAMPLES.md) | Right panels |
+| [INVENTORY_OFFLINE.md](INVENTORY_OFFLINE.md) | Full API |
+| [INVENTORY_ONLINE.md](INVENTORY_ONLINE.md) | MySQL save |

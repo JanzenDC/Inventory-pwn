@@ -9,6 +9,7 @@ Back to: [Readme.md](../Readme.md) | [Docs hub](INVENTORY.md) | [Easy examples](
 **Compile:** `compile_inventory.bat`
 
 > **Add an item step by step:** [INVENTORY_ADD_ITEMS.md](INVENTORY_ADD_ITEMS.md)  
+> **Weapons on the panel:** [INVENTORY_WEAPONS.md](INVENTORY_WEAPONS.md)  
 > **Right panel (drops / loot / house):** [INVENTORY_EXAMPLES.md](INVENTORY_EXAMPLES.md)
 
 ---
@@ -205,9 +206,9 @@ public Inv_OnItemPickup(playerid, pileid, const item[], model, quantity)
 }
 ```
 
-Guns are handled by the include: **Use** on a `Gun: ...` slot calls `Inventory_EquipGun` automatically.
-
 ### 5b) Place / equip guns
+
+Full starter guide: **[INVENTORY_WEAPONS.md](INVENTORY_WEAPONS.md)**
 
 Must be **holding** the weapon first:
 
@@ -215,6 +216,8 @@ Must be **holding** the weapon first:
 Inventory_PlaceGun(playerid);   // hand -> inventory (with ammo)
 Inventory_EquipGun(playerid, slot); // optional manual equip
 ```
+
+Guns are handled by the include: **Use** on a `Gun: ...` slot calls `Inventory_EquipGun` automatically.
 
 ### 6) Click-to-move
 
