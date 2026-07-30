@@ -12,6 +12,7 @@ Back to: [Readme.md](../Readme.md) | [Docs hub](INVENTORY.md) | [Easy examples](
 UI, guns, click-to-move, and ground bags work the same as offline. This page covers **database setup, save, and delete**.
 
 For UI / API / item tables, see [INVENTORY_OFFLINE.md](INVENTORY_OFFLINE.md).  
+To add items so they show on the panel, see [INVENTORY_ADD_ITEMS.md](INVENTORY_ADD_ITEMS.md).  
 For loot / house right-panel examples, see [INVENTORY_EXAMPLES.md](INVENTORY_EXAMPLES.md).
 
 ---

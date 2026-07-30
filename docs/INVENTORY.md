@@ -8,7 +8,8 @@ The inventory library is the same include for both modes. Choose the guide that 
 
 | Guide | When to use |
 |-------|-------------|
-| **[INVENTORY_EXAMPLES.md](INVENTORY_EXAMPLES.md)** | **Start here** — easy copy/paste for drops, loot, house, trunk |
+| **[INVENTORY_ADD_ITEMS.md](INVENTORY_ADD_ITEMS.md)** | **Starter** — add an item step by step so it shows on the panel |
+| [INVENTORY_EXAMPLES.md](INVENTORY_EXAMPLES.md) | Easy copy/paste for drops, loot, house, trunk |
 | [INVENTORY_OFFLINE.md](INVENTORY_OFFLINE.md) | Full offline API, guns, config |
 | [INVENTORY_ONLINE.md](INVENTORY_ONLINE.md) | MySQL save / delete |
 

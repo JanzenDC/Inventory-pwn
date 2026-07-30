@@ -8,7 +8,8 @@ Back to: [Readme.md](../Readme.md) | [Docs hub](INVENTORY.md) | [Easy examples](
 **Demo:** `gamemodes/inventory_test.pwn`  
 **Compile:** `compile_inventory.bat`
 
-> New to the right panel (drops / loot / house)? Start with **[INVENTORY_EXAMPLES.md](INVENTORY_EXAMPLES.md)**.
+> **Add an item step by step:** [INVENTORY_ADD_ITEMS.md](INVENTORY_ADD_ITEMS.md)  
+> **Right panel (drops / loot / house):** [INVENTORY_EXAMPLES.md](INVENTORY_EXAMPLES.md)
 
 ---
 
@@ -17,7 +18,7 @@ Back to: [Readme.md](../Readme.md) | [Docs hub](INVENTORY.md) | [Easy examples](
 - [Quick start](#quick-start)
 - [In-game commands](#in-game-commands)
 - [Using in your gamemode](#using-in-your-gamemode)
-- [Right panel contexts](#right-panel-contexts) → full walkthrough in [EXAMPLES](INVENTORY_EXAMPLES.md)
+- [Right panel contexts](#right-panel-contexts) → [EXAMPLES](INVENTORY_EXAMPLES.md) · [ADD ITEMS](INVENTORY_ADD_ITEMS.md)
 - [Configuration](#configuration)
 - [API](#api)
 - [Screenshots](#screenshots)

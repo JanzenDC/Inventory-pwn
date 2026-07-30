@@ -2,9 +2,10 @@
 
 Credits: **Habibi / Janzzzz**
 
-Back to: [Readme.md](../Readme.md) | [Docs hub](INVENTORY.md) | [Offline](INVENTORY_OFFLINE.md) | [Online](INVENTORY_ONLINE.md)
+Back to: [Readme.md](../Readme.md) | [Docs hub](INVENTORY.md) | [Add items](INVENTORY_ADD_ITEMS.md) | [Offline](INVENTORY_OFFLINE.md) | [Online](INVENTORY_ONLINE.md)
 
-This page is the **simple copy/paste guide**.  
+This page is the **simple copy/paste guide** for right panels (drops / loot / house).  
+New item not showing? Start with **[INVENTORY_ADD_ITEMS.md](INVENTORY_ADD_ITEMS.md)**.  
 For full API tables see [INVENTORY_OFFLINE.md](INVENTORY_OFFLINE.md).
 
 ---
@@ -350,6 +351,7 @@ House storage save is still your job inside `Inv_OnRightStorageChanged` (Example
 
 | Doc | Content |
 |-----|---------|
+| [INVENTORY_ADD_ITEMS.md](INVENTORY_ADD_ITEMS.md) | Add items step by step |
 | [INVENTORY.md](INVENTORY.md) | Hub / offline vs online |
 | [INVENTORY_OFFLINE.md](INVENTORY_OFFLINE.md) | Full offline API + config |
 | [INVENTORY_ONLINE.md](INVENTORY_ONLINE.md) | MySQL save / delete |

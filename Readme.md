@@ -14,18 +14,11 @@ LEFT = your bag          RIGHT = drops / loot / house / trunk
 
 | I want… | Open this |
 |---------|-----------|
-| **Easy examples** (drops, loot, house) with copy/paste | **[docs/INVENTORY_EXAMPLES.md](docs/INVENTORY_EXAMPLES.md)** |
+| **Add an item** so it shows on the panel | **[docs/INVENTORY_ADD_ITEMS.md](docs/INVENTORY_ADD_ITEMS.md)** |
+| Easy examples (drops, loot, house) | [docs/INVENTORY_EXAMPLES.md](docs/INVENTORY_EXAMPLES.md) |
 | Offline full guide (API, guns, config) | [docs/INVENTORY_OFFLINE.md](docs/INVENTORY_OFFLINE.md) |
 | Online MySQL save | [docs/INVENTORY_ONLINE.md](docs/INVENTORY_ONLINE.md) |
 | Offline vs online | [docs/INVENTORY.md](docs/INVENTORY.md) |
-
-The examples page covers:
-
-- How left/right panels work  
-- Minimal gamemode wiring  
-- `/inv` nearby drops  
-- `/loot` another player  
-- House / trunk storage + save callback  
 
 ---
 
@@ -53,6 +46,7 @@ compile_inventory.bat
 | [qawno/include/inventory_defs.inc](qawno/include/inventory_defs.inc) | Defines + forwards |
 | [gamemodes/inventory_test.pwn](gamemodes/inventory_test.pwn) | Offline demo |
 | [gamemodes/inventory_test_online.pwn](gamemodes/inventory_test_online.pwn) | MySQL demo |
+| [docs/INVENTORY_ADD_ITEMS.md](docs/INVENTORY_ADD_ITEMS.md) | Starter: add items |
 | [docs/INVENTORY_EXAMPLES.md](docs/INVENTORY_EXAMPLES.md) | Easy examples |
 | [docs/INVENTORY_OFFLINE.md](docs/INVENTORY_OFFLINE.md) | Offline docs |
 | [docs/INVENTORY_ONLINE.md](docs/INVENTORY_ONLINE.md) | Online docs |
