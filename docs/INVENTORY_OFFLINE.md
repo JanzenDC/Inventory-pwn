@@ -58,9 +58,31 @@ No MySQL plugin needed.
 | Click left slot | Select item (click again to cancel) |
 | Click right slot | Select / place into right context |
 | Click 2nd slot | Move / swap / stack onto that target |
+| Stack move (`qty > 1`) | Dialog asks how many to transfer |
 | **Use** | Use item, or equip gun |
-| **Drop** | Ground bag, or deposit into loot/storage |
+| **Drop** | Ground bag, or deposit into loot/storage (asks amount if stack) |
 | **Close** / ESC | Close UI |
+
+---
+
+## Transfer amount dialog
+
+When you **Drop** or click-move a **non-gun** stack with quantity greater than 1, a dialog opens:
+
+**Transfer amount** → `Enter amount to transfer (1 - X):`
+
+| Item | Dialog? |
+|------|---------|
+| Medkit x3, Bread x5, etc. | Yes - type how many (1 to max) |
+| Gun (`Gun: ...`) | No - whole weapon + ammo moves as one unit |
+| Quantity `1` | No - moves immediately |
+
+Works for:
+- **Drop** onto ground bag
+- **Drop** into house / loot / storage
+- Click-move onto an empty slot or same-item stack
+
+`OnDialogResponse` must call `Inventory_OnDialogResponse` (dialog id `DIALOG_INV_AMOUNT`, default `2200`).
 
 ---
 
@@ -70,7 +92,8 @@ No MySQL plugin needed.
 
 ```pawn
 #include <open.mp>
-#include <inventory>   // also pulls inventory_defs.inc
+#include <textdraw-streamer>  // optional but recommended (remove PlayerTextDraw limit)
+#include <inventory>          // also pulls inventory_defs.inc
 ```
 
 API-only (early):
@@ -85,6 +108,12 @@ Optional config **before** `#include <inventory>`:
 #define MAX_INVENTORY     (20)
 #define INV_DROP_OBJECT_MODEL (2919)
 #include <inventory>
+```
+
+Enable the plugin in `config.json`:
+
+```json
+"legacy_plugins": ["textdraw-streamer"]
 ```
 
 ### 2) Wire required callbacks
@@ -103,19 +132,23 @@ public OnPlayerDisconnect(playerid, reason)
     return 1;
 }
 
-public OnPlayerClickPlayerTextDraw(playerid, PlayerText:playertextid)
+// With textdraw-streamer (demo gamemodes):
+public OnClickDynamicPlayerTextDraw(playerid, PlayerText:textid)
 {
-    if (Inv_ClickPlayerTD(playerid, playertextid))
+    if (Inv_ClickPlayerTD(playerid, textid))
         return 1;
     return 0;
 }
 
-public OnPlayerClickTextDraw(playerid, Text:clickedid)
+public OnCancelDynamicTextDraw(playerid)
 {
-    if (clickedid == Text:INVALID_TEXT_DRAW)
-        Inv_HandleEscClose(playerid);
+    Inv_HandleEscClose(playerid);
     return 0;
 }
+
+// Without textdraw-streamer, use stock callbacks instead:
+// public OnPlayerClickPlayerTextDraw(playerid, PlayerText:playertextid)
+// public OnPlayerClickTextDraw(playerid, Text:clickedid)  // ESC = INVALID_TEXT_DRAW
 
 public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
 {
@@ -228,6 +261,8 @@ Guns are handled by the include: **Use** on a `Gun: ...` slot calls `Inventory_E
 - left -> right: deposit to nearest/front bag  
 - right -> left: take into inventory  
 - same panel: move / swap / stack  
+- **stack `qty > 1` (non-gun):** dialog asks how many to transfer  
+- **gun:** always moves as one whole slot (ammo stays with it)  
 
 ### 7) Ground bags
 
@@ -244,6 +279,7 @@ Right panel = **nearest bag only**. Nearby drops merge into one object.
 
 ```pawn
 #include <open.mp>
+#include <textdraw-streamer>
 #include <inventory>
 
 public OnPlayerConnect(playerid)
@@ -258,17 +294,16 @@ public OnPlayerDisconnect(playerid, reason)
     return 1;
 }
 
-public OnPlayerClickPlayerTextDraw(playerid, PlayerText:playertextid)
+public OnClickDynamicPlayerTextDraw(playerid, PlayerText:textid)
 {
-    if (Inv_ClickPlayerTD(playerid, playertextid))
+    if (Inv_ClickPlayerTD(playerid, textid))
         return 1;
     return 0;
 }
 
-public OnPlayerClickTextDraw(playerid, Text:clickedid)
+public OnCancelDynamicTextDraw(playerid)
 {
-    if (clickedid == Text:INVALID_TEXT_DRAW)
-        Inv_HandleEscClose(playerid);
+    Inv_HandleEscClose(playerid);
     return 0;
 }
 
@@ -327,7 +362,7 @@ Define **before** `#include <inventory>`:
 | `MAX_INVENTORY` | `20` | Slots per player |
 | `INV_UI_SLOTS` | same as `MAX_INVENTORY` | Visible grid slots |
 | `MAX_INVENTORY_ITEM_NAME` | `64` | Max item name length |
-| `DIALOG_INV_AMOUNT` | `2200` | Drop-amount dialog ID |
+| `DIALOG_INV_AMOUNT` | `2200` | Transfer-amount dialog ID (Drop / click-move stacks) |
 | `INV_SELECT_COLOUR` | `0xFFb05748` | Textdraw hover colour |
 | `INV_DROP_OBJECT_MODEL` | `2919` | Ground bag object |
 | `INV_DROP_RANGE` | `3.0` | Nearest-bag panel range |
@@ -384,7 +419,7 @@ On move/close in storage mode, `Inv_OnRightStorageChanged` fires — copy slots 
 | `DropItem` / `DropItemInFront` | Ground bag |
 | `Item_Nearest` / `Inventory_PickupDropped` | Find / take from bag |
 | `Inv_ClickPlayerTD` / `Inv_HandleEscClose` | UI wiring |
-| `Inventory_OnDialogResponse` | Drop amount dialog |
+| `Inventory_OnDialogResponse` | Transfer amount dialog (Drop / click-move) |
 
 ### Callbacks (offline)
 

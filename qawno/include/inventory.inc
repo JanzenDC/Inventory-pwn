@@ -116,6 +116,16 @@ static g_InvDragSlot[MAX_PLAYERS];
 static bool:g_InvBuilt[MAX_PLAYERS];
 static bool:g_InvIgnoreEsc[MAX_PLAYERS];
 
+// Pending amount dialog (drop / move)
+#define INV_AMOUNT_NONE  (0)
+#define INV_AMOUNT_DROP  (1)
+#define INV_AMOUNT_MOVE  (2)
+static g_InvAmountMode[MAX_PLAYERS];
+static g_InvAmountFromPanel[MAX_PLAYERS];
+static g_InvAmountFromSlot[MAX_PLAYERS];
+static g_InvAmountToPanel[MAX_PLAYERS];
+static g_InvAmountToSlot[MAX_PLAYERS];
+
 // Item add/remove toast queue (up to INV_NOTIFY_MAX side by side)
 static PlayerText:g_InvNotifPreview[MAX_PLAYERS][INV_NOTIFY_MAX];
 static PlayerText:g_InvNotifTitle[MAX_PLAYERS][INV_NOTIFY_MAX];
@@ -353,6 +363,7 @@ stock Inventory_Clear(playerid)
 	g_InvSelected2[playerid] = -1;
 	g_InvDragPanel[playerid] = INV_PANEL_NONE;
 	g_InvDragSlot[playerid] = -1;
+	g_InvAmountMode[playerid] = INV_AMOUNT_NONE;
 	return 1;
 }
 
@@ -365,6 +376,7 @@ stock Inventory_OnPlayerConnect(playerid)
 	g_InvNearPile[playerid] = -1;
 	g_InvDragPanel[playerid] = INV_PANEL_NONE;
 	g_InvDragSlot[playerid] = -1;
+	g_InvAmountMode[playerid] = INV_AMOUNT_NONE;
 	g_InvRightMode[playerid] = INV_RIGHT_DROPS;
 	g_InvRightId[playerid] = -1;
 	g_InvRightTitle[playerid][0] = EOS;
@@ -1341,7 +1353,8 @@ stock DropPile_GetOrCreateNearPlayer(playerid)
 }
 
 // Move / swap / stack between any two slots (left inventory or right context).
-stock Inv_MoveBetweenSlots(playerid, fromPanel, fromSlot, toPanel, toSlot)
+// amount < 1 means move the whole stack (guns always move as one unit).
+stock Inv_MoveBetweenSlots(playerid, fromPanel, fromSlot, toPanel, toSlot, amount = -1)
 {
 	if (fromPanel == toPanel && fromSlot == toSlot)
 		return 0;
@@ -1394,9 +1407,39 @@ stock Inv_MoveBetweenSlots(playerid, fromPanel, fromSlot, toPanel, toSlot)
 		Inv_RightReadSlot(playerid, toSlot, toExists, toModel, toQty, toName, sizeof(toName));
 	}
 
-	// Stack same items onto target
-	if (toExists && !strcmp(fromName, toName, true) && fromModel == toModel)
+	new transferQty = fromQty;
+	if (amount > 0 && amount < fromQty)
+		transferQty = amount;
+
+	new movedQty = fromQty;
+	new bool:partialOk = (!Inv_IsGunItem(fromName)
+		&& (!toExists || (!strcmp(fromName, toName, true) && fromModel == toModel)));
+
+	if (partialOk && transferQty < fromQty)
 	{
+		movedQty = transferQty;
+		if (!toExists)
+		{
+			toExists = true;
+			toModel = fromModel;
+			toQty = transferQty;
+			format(toName, sizeof(toName), "%s", fromName);
+		}
+		else
+			toQty += transferQty;
+
+		fromQty -= transferQty;
+		if (fromQty <= 0)
+		{
+			fromExists = false;
+			fromQty = 0;
+			fromModel = 0;
+			fromName[0] = EOS;
+		}
+	}
+	else if (toExists && !strcmp(fromName, toName, true) && fromModel == toModel)
+	{
+		// Stack same items onto target (full amount)
 		toQty += fromQty;
 		fromExists = false;
 		fromQty = 0;
@@ -1444,36 +1487,36 @@ stock Inv_MoveBetweenSlots(playerid, fromPanel, fromSlot, toPanel, toSlot)
 	{
 		if (mode == INV_RIGHT_DROPS)
 		{
-			CallLocalFunction("Inv_OnItemDrop", "ddsii", playerid, fromSlot, toName, toModel, toQty);
-			Inventory_NotifyRemoved(playerid, toName, toModel, toQty);
+			CallLocalFunction("Inv_OnItemDrop", "ddsii", playerid, fromSlot, toName, toModel, movedQty);
+			Inventory_NotifyRemoved(playerid, toName, toModel, movedQty);
 		}
 		else if (mode == INV_RIGHT_PLAYER)
 		{
-			CallLocalFunction("Inv_OnLootTransfer", "ddisii", playerid, g_InvRightId[playerid], false, toName, toModel, toQty);
-			Inventory_NotifyRemoved(playerid, toName, toModel, toQty);
+			CallLocalFunction("Inv_OnLootTransfer", "ddisii", playerid, g_InvRightId[playerid], false, toName, toModel, movedQty);
+			Inventory_NotifyRemoved(playerid, toName, toModel, movedQty);
 		}
 		else
 		{
 			CallLocalFunction("Inv_OnRightStorageChanged", "dd", playerid, g_InvRightId[playerid]);
-			Inventory_NotifyRemoved(playerid, toName, toModel, toQty);
+			Inventory_NotifyRemoved(playerid, toName, toModel, movedQty);
 		}
 	}
 	else if (fromPanel == INV_PANEL_RIGHT && toPanel == INV_PANEL_LEFT)
 	{
 		if (mode == INV_RIGHT_DROPS)
 		{
-			CallLocalFunction("Inv_OnItemPickup", "ddsii", playerid, pileid, toName, toModel, toQty);
-			Inventory_NotifyReceived(playerid, toName, toModel, toQty);
+			CallLocalFunction("Inv_OnItemPickup", "ddsii", playerid, pileid, toName, toModel, movedQty);
+			Inventory_NotifyReceived(playerid, toName, toModel, movedQty);
 		}
 		else if (mode == INV_RIGHT_PLAYER)
 		{
-			CallLocalFunction("Inv_OnLootTransfer", "ddisii", playerid, g_InvRightId[playerid], true, toName, toModel, toQty);
-			Inventory_NotifyReceived(playerid, toName, toModel, toQty);
+			CallLocalFunction("Inv_OnLootTransfer", "ddisii", playerid, g_InvRightId[playerid], true, toName, toModel, movedQty);
+			Inventory_NotifyReceived(playerid, toName, toModel, movedQty);
 		}
 		else
 		{
 			CallLocalFunction("Inv_OnRightStorageChanged", "dd", playerid, g_InvRightId[playerid]);
-			Inventory_NotifyReceived(playerid, toName, toModel, toQty);
+			Inventory_NotifyReceived(playerid, toName, toModel, movedQty);
 		}
 	}
 	else if (mode == INV_RIGHT_STORAGE && (fromPanel == INV_PANEL_RIGHT || toPanel == INV_PANEL_RIGHT))
@@ -1523,6 +1566,72 @@ stock Inv_DoDropFromSlot(playerid, slot, amount)
 	return 1;
 }
 
+stock Inv_ClearAmountPrompt(playerid)
+{
+	g_InvAmountMode[playerid] = INV_AMOUNT_NONE;
+	g_InvAmountFromPanel[playerid] = INV_PANEL_NONE;
+	g_InvAmountFromSlot[playerid] = -1;
+	g_InvAmountToPanel[playerid] = INV_PANEL_NONE;
+	g_InvAmountToSlot[playerid] = -1;
+	return 1;
+}
+
+stock Inv_PromptAmount(playerid, mode, fromPanel, fromSlot, toPanel, toSlot, maxQty)
+{
+	g_InvAmountMode[playerid] = mode;
+	g_InvAmountFromPanel[playerid] = fromPanel;
+	g_InvAmountFromSlot[playerid] = fromSlot;
+	g_InvAmountToPanel[playerid] = toPanel;
+	g_InvAmountToSlot[playerid] = toSlot;
+
+	new info[96];
+	format(info, sizeof(info), "Enter amount to transfer (1 - %d):", maxQty);
+	ShowPlayerDialog(playerid, DIALOG_INV_AMOUNT, DIALOG_STYLE_INPUT,
+		"Transfer amount", info, "OK", "Cancel");
+	return 1;
+}
+
+// Returns 1 if moved or amount dialog shown, 0 on failure.
+stock Inv_TryMoveBetweenSlots(playerid, fromPanel, fromSlot, toPanel, toSlot)
+{
+	new fromModel, fromQty, fromName[MAX_INVENTORY_ITEM_NAME];
+	new bool:toExists, toModel, toName[MAX_INVENTORY_ITEM_NAME];
+	new bool:fromExists, toQty;
+
+	if (fromPanel == INV_PANEL_LEFT)
+	{
+		if (fromSlot < 0 || fromSlot >= MAX_INVENTORY || !InventoryData[playerid][fromSlot][invExists])
+			return 0;
+		fromModel = InventoryData[playerid][fromSlot][invModel];
+		fromQty = InventoryData[playerid][fromSlot][invQuantity];
+		format(fromName, sizeof(fromName), "%s", InventoryData[playerid][fromSlot][invItem]);
+	}
+	else if (!Inv_RightReadSlot(playerid, fromSlot, fromExists, fromModel, fromQty, fromName, sizeof(fromName)))
+		return 0;
+
+	if (toPanel == INV_PANEL_LEFT)
+	{
+		toExists = InventoryData[playerid][toSlot][invExists];
+		toModel = InventoryData[playerid][toSlot][invModel];
+		format(toName, sizeof(toName), "%s", InventoryData[playerid][toSlot][invItem]);
+	}
+	else
+		Inv_RightReadSlot(playerid, toSlot, toExists, toModel, toQty, toName, sizeof(toName));
+
+	#pragma unused fromExists, toQty
+
+	new bool:partialOk = (!Inv_IsGunItem(fromName) && fromQty > 1
+		&& (!toExists || (!strcmp(fromName, toName, true) && fromModel == toModel)));
+
+	if (partialOk)
+	{
+		Inv_ClearDrag(playerid);
+		return Inv_PromptAmount(playerid, INV_AMOUNT_MOVE, fromPanel, fromSlot, toPanel, toSlot, fromQty);
+	}
+
+	return Inv_MoveBetweenSlots(playerid, fromPanel, fromSlot, toPanel, toSlot, -1);
+}
+
 // ---------------------------------------------------------------------------
 // Left panel refresh
 // ---------------------------------------------------------------------------
@@ -1551,10 +1660,7 @@ stock Inv_RefreshSlot(playerid, slot)
 		PlayerTextDrawSetPreviewModel(playerid, g_InvPreview[playerid][slot], InventoryData[playerid][slot][invModel]);
 		PlayerTextDrawBackgroundColour(playerid, g_InvPreview[playerid][slot], selected ? (-1523963217) : (30));
 		PlayerTextDrawSetString(playerid, g_InvName[playerid][slot], InventoryData[playerid][slot][invItem]);
-		if (Inv_IsGunItem(InventoryData[playerid][slot][invItem]))
-			format(string, sizeof(string), "A:%i", InventoryData[playerid][slot][invQuantity]);
-		else
-			format(string, sizeof(string), "%i", InventoryData[playerid][slot][invQuantity]);
+		format(string, sizeof(string), "%i", InventoryData[playerid][slot][invQuantity]);
 		PlayerTextDrawSetString(playerid, g_InvQty[playerid][slot], string);
 		PlayerTextDrawUseBox(playerid, g_InvAccent[playerid][slot], true);
 		PlayerTextDrawShow(playerid, g_InvName[playerid][slot]);
@@ -1614,10 +1720,7 @@ stock Inv_RefreshRightSlot(playerid, ui)
 		PlayerTextDrawSetPreviewModel(playerid, g_Inv2Preview[playerid][ui], model);
 		PlayerTextDrawBackgroundColour(playerid, g_Inv2Preview[playerid][ui], selected ? (-1523963217) : (30));
 		PlayerTextDrawSetString(playerid, g_Inv2Name[playerid][ui], itemName);
-		if (Inv_IsGunItem(itemName))
-			format(string, sizeof(string), "A:%i", qty);
-		else
-			format(string, sizeof(string), "%i", qty);
+		format(string, sizeof(string), "%i", qty);
 		PlayerTextDrawSetString(playerid, g_Inv2Qty[playerid][ui], string);
 		PlayerTextDrawUseBox(playerid, g_Inv2Accent[playerid][ui], true);
 		PlayerTextDrawShow(playerid, g_Inv2Name[playerid][ui]);
@@ -1986,6 +2089,7 @@ stock Inventory_Hide(playerid, bool:resetContext = true)
 	g_InvSelected2[playerid] = -1;
 	g_InvDragPanel[playerid] = INV_PANEL_NONE;
 	g_InvDragSlot[playerid] = -1;
+	Inv_ClearAmountPrompt(playerid);
 	Inv_DestroyUI(playerid);
 	g_InvIgnoreEsc[playerid] = true;
 	CancelSelectTextDraw(playerid);
@@ -2039,7 +2143,7 @@ stock Inv_ClickPlayerTD(playerid, PlayerText:playertextid)
 			return 1;
 		}
 
-		if (!Inv_MoveBetweenSlots(playerid, g_InvDragPanel[playerid], g_InvDragSlot[playerid], INV_PANEL_LEFT, slot))
+		if (!Inv_TryMoveBetweenSlots(playerid, g_InvDragPanel[playerid], g_InvDragSlot[playerid], INV_PANEL_LEFT, slot))
 			SendClientMessage(playerid, 0xFFFF00AA, "Could not move that item.");
 		return 1;
 	}
@@ -2068,7 +2172,7 @@ stock Inv_ClickPlayerTD(playerid, PlayerText:playertextid)
 			return 1;
 		}
 
-		if (!Inv_MoveBetweenSlots(playerid, g_InvDragPanel[playerid], g_InvDragSlot[playerid], INV_PANEL_RIGHT, ui))
+		if (!Inv_TryMoveBetweenSlots(playerid, g_InvDragPanel[playerid], g_InvDragSlot[playerid], INV_PANEL_RIGHT, ui))
 			SendClientMessage(playerid, 0xFFFF00AA, "Could not move that item.");
 		return 1;
 	}
@@ -2104,6 +2208,9 @@ stock Inv_ClickPlayerTD(playerid, PlayerText:playertextid)
 		if (slot < 0 || !InventoryData[playerid][slot][invExists])
 			return SendClientMessage(playerid, 0xAAAAAAFF, "Select an inventory item first."), 1;
 
+		new qty = InventoryData[playerid][slot][invQuantity];
+		new bool:isGun = bool:Inv_IsGunItem(InventoryData[playerid][slot][invItem]);
+
 		// In loot/storage mode, Drop moves into the right panel
 		if (g_InvRightMode[playerid] != INV_RIGHT_DROPS)
 		{
@@ -2111,22 +2218,25 @@ stock Inv_ClickPlayerTD(playerid, PlayerText:playertextid)
 			new dest = Inv_RightFindFree(playerid);
 			if (dest == -1)
 				return SendClientMessage(playerid, 0xFFFF00AA, "Right panel is full."), 1;
-			if (!Inv_MoveBetweenSlots(playerid, INV_PANEL_LEFT, slot, INV_PANEL_RIGHT, dest))
+			if (!isGun && qty > 1)
+			{
+				Inv_PromptAmount(playerid, INV_AMOUNT_MOVE, INV_PANEL_LEFT, slot, INV_PANEL_RIGHT, dest, qty);
+				return 1;
+			}
+			if (!Inv_MoveBetweenSlots(playerid, INV_PANEL_LEFT, slot, INV_PANEL_RIGHT, dest, -1))
 				SendClientMessage(playerid, 0xFFFF00AA, "Could not move that item.");
 			return 1;
 		}
 
-		new qty = InventoryData[playerid][slot][invQuantity];
-		// Guns always drop as one whole weapon (ammo stays with it)
-		if (Inv_IsGunItem(InventoryData[playerid][slot][invItem]) || qty <= 1)
+		// Guns: whole weapon + ammo. Stacks: ask how many to drop.
+		if (isGun || qty <= 1)
 		{
 			Inv_DoDropFromSlot(playerid, slot, qty);
 			Inv_ClearDrag(playerid);
 			return 1;
 		}
 
-		ShowPlayerDialog(playerid, DIALOG_INV_AMOUNT, DIALOG_STYLE_INPUT,
-			"Drop amount", "Enter how many to drop in front of you:", "Drop", "Cancel");
+		Inv_PromptAmount(playerid, INV_AMOUNT_DROP, INV_PANEL_LEFT, slot, INV_PANEL_NONE, -1, qty);
 		return 1;
 	}
 
@@ -2144,19 +2254,50 @@ stock Inventory_OnDialogResponse(playerid, dialogid, response, listitem, const i
 	#pragma unused listitem
 	if (dialogid != DIALOG_INV_AMOUNT)
 		return 0;
+
+	new mode = g_InvAmountMode[playerid];
+	new fromPanel = g_InvAmountFromPanel[playerid];
+	new fromSlot = g_InvAmountFromSlot[playerid];
+	new toPanel = g_InvAmountToPanel[playerid];
+	new toSlot = g_InvAmountToSlot[playerid];
+	Inv_ClearAmountPrompt(playerid);
+
 	if (!response)
 		return 1;
 
-	new slot = g_InvSelected[playerid];
-	if (slot < 0 || !InventoryData[playerid][slot][invExists])
+	if (fromSlot < 0)
 		return 1;
+
+	new maxQty = 0;
+	if (fromPanel == INV_PANEL_LEFT)
+	{
+		if (!InventoryData[playerid][fromSlot][invExists])
+			return 1;
+		maxQty = InventoryData[playerid][fromSlot][invQuantity];
+	}
+	else
+	{
+		new bool:exists, model, qty, name[MAX_INVENTORY_ITEM_NAME];
+		if (!Inv_RightReadSlot(playerid, fromSlot, exists, model, qty, name, sizeof(name)) || !exists)
+			return 1;
+		maxQty = qty;
+	}
 
 	new amount = strval(inputtext);
 	if (amount < 1)
 		amount = 1;
-	if (amount > InventoryData[playerid][slot][invQuantity])
-		amount = InventoryData[playerid][slot][invQuantity];
+	if (amount > maxQty)
+		amount = maxQty;
 
-	Inv_DoDropFromSlot(playerid, slot, amount);
+	if (mode == INV_AMOUNT_DROP)
+	{
+		Inv_DoDropFromSlot(playerid, fromSlot, amount);
+		Inv_ClearDrag(playerid);
+	}
+	else if (mode == INV_AMOUNT_MOVE)
+	{
+		if (!Inv_MoveBetweenSlots(playerid, fromPanel, fromSlot, toPanel, toSlot, amount))
+			SendClientMessage(playerid, 0xFFFF00AA, "Could not move that item.");
+	}
 	return 1;
 }

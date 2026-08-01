@@ -51,6 +51,7 @@ You do **not** make a new UI for house or loot. You only tell the right panel *w
 
 ```pawn
 #include <open.mp>
+#include <textdraw-streamer>
 #include <inventory>
 
 public OnPlayerConnect(playerid)
@@ -65,17 +66,16 @@ public OnPlayerDisconnect(playerid, reason)
     return 1;
 }
 
-public OnPlayerClickPlayerTextDraw(playerid, PlayerText:playertextid)
+public OnClickDynamicPlayerTextDraw(playerid, PlayerText:textid)
 {
-    if (Inv_ClickPlayerTD(playerid, playertextid))
+    if (Inv_ClickPlayerTD(playerid, textid))
         return 1;
     return 0;
 }
 
-public OnPlayerClickTextDraw(playerid, Text:clickedid)
+public OnCancelDynamicTextDraw(playerid)
 {
-    if (clickedid == Text:INVALID_TEXT_DRAW)
-        Inv_HandleEscClose(playerid);
+    Inv_HandleEscClose(playerid);
     return 0;
 }
 
@@ -324,10 +324,30 @@ Closing with **Close** or **ESC** also resets the right panel to nearby drops.
 | They do this | Result |
 |--------------|--------|
 | Click item, click empty/other slot | Move / swap / stack |
+| Move a stack (`qty > 1`, not a gun) | **Transfer amount** dialog - type how many |
 | **Use** | Use food/item, or equip a gun from inventory |
-| **Drop** while right = drops | Put item on the ground bag |
-| **Drop** while right = loot/house | Put item into the right panel |
+| **Drop** while right = drops | Put item on the ground bag (asks amount if stack) |
+| **Drop** while right = loot/house | Put item into the right panel (asks amount if stack) |
+| **Drop** / move a gun | Whole gun + ammo, no amount dialog |
 | **Close** / ESC | Close UI |
+
+### Transfer amount
+
+Dialog title: **Transfer amount**  
+Body: `Enter amount to transfer (1 - X):`
+
+Wire it in your gamemode:
+
+```pawn
+public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
+{
+    if (Inventory_OnDialogResponse(playerid, dialogid, response, listitem, inputtext))
+        return 1;
+    return 0;
+}
+```
+
+Default dialog id: `DIALOG_INV_AMOUNT` (`2200`). Override before `#include <inventory>` if needed.
 
 ---
 
@@ -337,7 +357,10 @@ Closing with **Close** or **ESC** also resets the right panel to nearby drops.
 No. Same UI. Only the right panel data changes.
 
 **Q: Can I use loot + house + drops together?**  
-Yes — one at a time. Each open sets one right mode.
+Yes - one at a time. Each open sets one right mode.
+
+**Q: Why no amount dialog for my Deagle?**  
+Guns use quantity as **ammo**. They always move as one unit. See [INVENTORY_WEAPONS.md](INVENTORY_WEAPONS.md).
 
 **Q: Where do toasts (Received / Removed) come from?**  
 Automatic on add/remove. See [offline config](INVENTORY_OFFLINE.md#configuration) for `INV_NOTIFY_*`.

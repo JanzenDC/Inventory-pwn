@@ -37,6 +37,10 @@ compile_inventory.bat
 | `/loot` `[id]` | Other player |
 | `/houseinv` | Demo house storage |
 
+Drop / move a stack (`qty > 1`) → **Transfer amount** dialog. Guns move as one unit (ammo). See [docs/INVENTORY_OFFLINE.md](docs/INVENTORY_OFFLINE.md#transfer-amount-dialog).
+
+`config.json` should include `"legacy_plugins": ["textdraw-streamer"]`.
+
 ---
 
 ## Files

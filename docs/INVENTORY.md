@@ -31,6 +31,7 @@ The inventory library is the same include for both modes. Choose the guide that 
 - Textdraw UI (left = your bag, right = **dynamic context**)
 - Right modes: nearby drops / player loot / house-storage buffer
 - Click-to-move, Use / Drop / Close
+- **Transfer amount** dialog when moving/dropping a stack (`qty > 1`)
 - Item table pattern, placegun / equip gun
 - Ground bag object + label
 

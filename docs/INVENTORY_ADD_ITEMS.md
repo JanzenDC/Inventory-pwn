@@ -40,6 +40,7 @@ Open `/inv` → the item appears on the **left** panel.
 
 ```pawn
 #include <open.mp>
+#include <textdraw-streamer>
 #include <inventory>
 
 public OnPlayerConnect(playerid)
@@ -54,17 +55,16 @@ public OnPlayerDisconnect(playerid, reason)
     return 1;
 }
 
-public OnPlayerClickPlayerTextDraw(playerid, PlayerText:playertextid)
+public OnClickDynamicPlayerTextDraw(playerid, PlayerText:textid)
 {
-    if (Inv_ClickPlayerTD(playerid, playertextid))
+    if (Inv_ClickPlayerTD(playerid, textid))
         return 1;
     return 0;
 }
 
-public OnPlayerClickTextDraw(playerid, Text:clickedid)
+public OnCancelDynamicTextDraw(playerid)
 {
-    if (clickedid == Text:INVALID_TEXT_DRAW)
-        Inv_HandleEscClose(playerid);
+    Inv_HandleEscClose(playerid);
     return 0;
 }
 
@@ -75,6 +75,8 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[])
     return 0;
 }
 ```
+
+`OnDialogResponse` is required for the **Transfer amount** dialog when dropping/moving stacks (`qty > 1`).
 
 ### Step 2 — Give the item
 
@@ -106,6 +108,8 @@ public OnPlayerCommandText(playerid, cmdtext[])
 4. Left panel shows **Water** with model `1484`
 
 You should also see a short **Received** toast.
+
+Stacks: `Inventory_Add(playerid, "Water", 1484, 5)` gives 5 Water. Drop or click-move asks **how many** to transfer. Details: [INVENTORY_OFFLINE.md - Transfer amount](INVENTORY_OFFLINE.md#transfer-amount-dialog).
 
 ---
 

@@ -102,7 +102,9 @@
     },
     "password": "",
     "pawn": {
-        "legacy_plugins": [],
+        "legacy_plugins": [
+            "textdraw-streamer"
+        ],
         "main_scripts": [
             "inventory_test 1"
         ],

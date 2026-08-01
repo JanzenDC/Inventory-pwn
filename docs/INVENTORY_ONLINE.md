@@ -37,7 +37,7 @@ For loot / house right-panel examples, see [INVENTORY_EXAMPLES.md](INVENTORY_EXA
 
 ```json
 "pawn": {
-    "legacy_plugins": ["mysql"],
+    "legacy_plugins": ["mysql", "textdraw-streamer"],
     "main_scripts": ["inventory_test_online 1"]
 }
 ```
@@ -154,6 +154,7 @@ Same UI wiring as offline, plus load/save:
 ```pawn
 #include <open.mp>
 #include <a_mysql>
+#include <textdraw-streamer>
 #include <inventory>
 
 public OnPlayerConnect(playerid)

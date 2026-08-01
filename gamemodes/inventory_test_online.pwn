@@ -5,6 +5,7 @@
     Credits: Habibi / Janzzzz
 
     Requires:
+      - textdraw-streamer plugin (config.json -> pawn.legacy_plugins)
       - MySQL plugin (R39) in plugins/ (config.json -> pawn.legacy_plugins)
       - a_mysql.inc (already in qawno/include)
       - Edit MYSQL_* defines below to match your server
@@ -20,6 +21,7 @@
 
 #include <open.mp>
 #include <a_mysql>
+#include <textdraw-streamer>
 #include <inventory>
 
 // ---------------------------------------------------------------------------
@@ -294,17 +296,16 @@ public OnPlayerCommandText(playerid, cmdtext[])
     return 0;
 }
 
-public OnPlayerClickPlayerTextDraw(playerid, PlayerText:playertextid)
+public OnClickDynamicPlayerTextDraw(playerid, PlayerText:textid)
 {
-    if (Inv_ClickPlayerTD(playerid, playertextid))
+    if (Inv_ClickPlayerTD(playerid, textid))
         return 1;
     return 0;
 }
 
-public OnPlayerClickTextDraw(playerid, Text:clickedid)
+public OnCancelDynamicTextDraw(playerid)
 {
-    if (clickedid == Text:INVALID_TEXT_DRAW)
-        Inv_HandleEscClose(playerid);
+    Inv_HandleEscClose(playerid);
     return 0;
 }
 

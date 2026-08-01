@@ -19,7 +19,7 @@ Guns are **not** normal table items like Bread.
 | `Inventory_Add(...)` | Prefer `Inventory_PlaceGun(playerid)` |
 
 ```
-Hold weapon in hand  →  /placegun  →  left panel shows "Gun: ..." + A:50
+Hold weapon in hand  →  /placegun  →  left panel shows "Gun: ..." + qty (ammo)
 Select slot + Use    →  gun back in hand, slot removed
 ```
 
@@ -69,7 +69,7 @@ You should see:
 
 - Preview of the gun model  
 - Name like `Gun: Desert Eagle`  
-- Qty text like `A:50` (ammo, not stack)
+- Qty text like `50` (ammo number, not a stack count)
 
 ---
 
@@ -174,9 +174,11 @@ Safer for DB load: `Inventory_SetSlot` with the same fields (silent, no toast).
 
 | Action | Result |
 |--------|--------|
-| **Drop** on a gun | Whole gun + ammo goes to ground bag (no amount dialog) |
-| Click-move to right | Same — moves as one slot |
+| **Drop** on a gun | Whole gun + ammo goes to ground bag (**no** amount dialog) |
+| Click-move to right | Same - moves as one slot |
 | Pickup from bag | Gun returns to left panel with ammo |
+
+Normal items with `qty > 1` show a **Transfer amount** dialog instead. See [INVENTORY_OFFLINE.md - Transfer amount](INVENTORY_OFFLINE.md#transfer-amount-dialog).
 
 ---
 
@@ -188,7 +190,7 @@ Safer for DB load: `Inventory_SetSlot` with the same fields (silent, no toast).
 | Fist / invalid weapon | Only weapons with a preview model work |
 | Inventory full | Free a slot |
 | Added with wrong name | Must start with `Gun: ` for Use→equip |
-| Qty looks wrong | For guns, number is **ammo** (`A:50`) |
+| Qty looks wrong | For guns, number is **ammo** (plain `50`, not a stack) |
 
 ---
 
@@ -230,7 +232,7 @@ Player1    | 3    | Gun: Desert Eagle  | 348      | 50
        → Inv_OnInventoryChanged → MySQL save (after ~1.2s)
 
 Reconnect → SELECT rows → Inventory_SetSlot(...)
-         → /inv shows the gun again with A:50
+         → /inv shows the gun again with ammo qty (e.g. 50)
          → Use → Inventory_EquipGun → ammo restored to hand
 ```
 

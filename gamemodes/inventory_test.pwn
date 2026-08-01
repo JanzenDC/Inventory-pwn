@@ -15,6 +15,7 @@
 */
 
 #include <open.mp>
+#include <textdraw-streamer>
 #include <inventory>
 
 // One row per item - add new items here only.
@@ -235,17 +236,16 @@ public OnPlayerCommandText(playerid, cmdtext[])
     return 0;
 }
 
-public OnPlayerClickPlayerTextDraw(playerid, PlayerText:playertextid)
+public OnClickDynamicPlayerTextDraw(playerid, PlayerText:textid)
 {
-    if (Inv_ClickPlayerTD(playerid, playertextid))
+    if (Inv_ClickPlayerTD(playerid, textid))
         return 1;
     return 0;
 }
 
-public OnPlayerClickTextDraw(playerid, Text:clickedid)
+public OnCancelDynamicTextDraw(playerid)
 {
-    if (clickedid == Text:INVALID_TEXT_DRAW)
-        Inv_HandleEscClose(playerid);
+    Inv_HandleEscClose(playerid);
     return 0;
 }
 
