@@ -106,7 +106,7 @@
             "textdraw-streamer"
         ],
         "main_scripts": [
-            "inventory_test 1"
+            "loading_y_test 1"
         ],
         "side_scripts": []
     },
